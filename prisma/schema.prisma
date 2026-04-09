@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// Este modelo es el MVP de nuestra Fase 1
+model Company {
+  id              String   @id @default(uuid())
+  ownerId         String   @unique // Esto se conectará con el usuario de Supabase Auth
+  companyName     String   @unique
+  
+  // Finanzas Base
+  liquidCash      Float    @default(100000.0) // El capital semilla del inversor oscuro
+  revenuePerHour  Float    @default(1500.0)   // El CEO genera esto desde el segundo 1
+  expensesPerHour Float    @default(0.0)      // Gastos iniciales
+  
+  // El Reloj (Vital para la magia de actualización)
+  lastUpdated     DateTime @default(now())    // La última vez que el servidor hizo cuentas
+  
+  createdAt       DateTime @default(now())
+}
