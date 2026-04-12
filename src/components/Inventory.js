@@ -1,8 +1,19 @@
 import { BUILDINGS } from '../game/constants'
+import { sanitizeNumber } from '../utils/company'
 
-export default function Inventory({ facilities, employees }) {
-  // Agrupamos edificios por tipo para contarlos
-  const countByType = (type) => facilities.filter(f => f.type === type).length
+export default function Inventory({ employees, facilities }) {
+  // Contamos la cantidad total de cada tipo de instalación para mostrar en el UI
+  const totalOffices = sanitizeNumber(facilities?.OFFICE, 0, { min: 0 });
+  const totalDatacenters = sanitizeNumber(facilities?.DATACENTER, 0, { min: 0 });
+  const totalBasements = sanitizeNumber(facilities?.BASEMENT, 0, { min: 0 });
+  const safeEmployees = {
+    programmers: sanitizeNumber(employees?.programmers, 0, { min: 0 }),
+    totalProgrammersCapacity: sanitizeNumber(employees?.totalProgrammersCapacity, 0, { min: 0 }),
+    analysts: sanitizeNumber(employees?.analysts, 0, { min: 0 }),
+    totalAnalystsCapacity: sanitizeNumber(employees?.totalAnalystsCapacity, 0, { min: 0 }),
+    saboteurs: sanitizeNumber(employees?.saboteurs, 0, { min: 0 }),
+    totalSaboteursCapacity: sanitizeNumber(employees?.totalSaboteursCapacity, 0, { min: 0 })
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -17,7 +28,7 @@ export default function Inventory({ facilities, employees }) {
               <p className="text-white font-medium">{BUILDINGS.OFFICE.name}</p>
               <p className="text-xs text-neutral-500">Numero de edificios obtenidos</p>
             </div>
-            <span className="text-xl font-bold text-white">x{countByType("OFFICE")}</span>
+            <span className="text-xl font-bold text-white">x{totalOffices}</span>
           </div>
 
           <div className="p-4 flex justify-between items-center">
@@ -25,7 +36,7 @@ export default function Inventory({ facilities, employees }) {
               <p className="text-white font-medium">{BUILDINGS.DATACENTER.name}</p>
               <p className="text-xs text-neutral-500">Numero de edificios obtenidos</p>
             </div>
-            <span className="text-xl font-bold text-white">x{countByType("DATACENTER")}</span>
+            <span className="text-xl font-bold text-white">x{totalDatacenters}</span>
           </div>
 
           <div className="p-4 flex justify-between items-center">
@@ -33,7 +44,7 @@ export default function Inventory({ facilities, employees }) {
                 <p className="text-white font-medium">{BUILDINGS.BASEMENT.name}</p>
                 <p className="text-xs text-neutral-500">Numero de edificios obtenidos</p>
             </div>
-            <span className="text-xl font-bold text-white">x{countByType("BASEMENT")}</span>
+            <span className="text-xl font-bold text-white">x{totalBasements}</span>
           </div>
 
         </div>
@@ -49,19 +60,19 @@ export default function Inventory({ facilities, employees }) {
                   <p className="text-xs text-neutral-500 italic">Generando software de alta frecuencia</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-2xl font-black text-blue-400">{employees.programmers}</span>
-                  <span className="text-neutral-600 text-lg"> / {employees.totalProgrammersCapacity}</span>
+                  <span className="text-2xl font-black text-blue-400">{safeEmployees.programmers}</span>
+                  <span className="text-neutral-600 text-lg"> / {safeEmployees.totalProgrammersCapacity}</span>
                 </div>
             </div>
           
           {/* Barra de capacidad visual */}
           <div className="w-full bg-neutral-800 h-2 rounded-full overflow-hidden">
-            <div 
-              className={`h-full transition-all duration-500 ${employees.programmers >= employees.totalProgrammersCapacity ? 'bg-red-500' : 'bg-blue-500'}`}
-              style={{ width: `${Math.min(100, (employees.programmers / (employees.totalProgrammersCapacity || 1)) * 100)}%` }}
+              <div 
+              className={`h-full transition-all duration-500 ${safeEmployees.programmers >= safeEmployees.totalProgrammersCapacity ? 'bg-red-500' : 'bg-blue-500'}`}
+              style={{ width: `${Math.min(100, (safeEmployees.programmers / (safeEmployees.totalProgrammersCapacity || 1)) * 100)}%` }}
             ></div>
           </div>
-          {employees.programmers >= employees.totalProgrammersCapacity && (
+          {safeEmployees.programmers >= safeEmployees.totalProgrammersCapacity && (
             <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tighter text-right animate-pulse">
               Capacidad máxima alcanzada
             </p>
@@ -75,18 +86,18 @@ export default function Inventory({ facilities, employees }) {
                     <p className="text-xs text-neutral-500 italic"> desarollando software para mas eficiencia de Operaciones </p>
                 </div>
                 <div className="text-right">
-                    <span className="text-2xl font-black text-blue-400">{employees.analysts}</span>
-                    <span className="text-neutral-600 text-lg"> / {employees.totalAnalystsCapacity}</span>
+                    <span className="text-2xl font-black text-blue-400">{safeEmployees.analysts}</span>
+                    <span className="text-neutral-600 text-lg"> / {safeEmployees.totalAnalystsCapacity}</span>
                 </div>
             </div>
 
             <div className="w-full bg-neutral-800 h-2 rounded-full overflow-hidden">
                 <div 
-                    className={`h-full transition-all duration-500 ${employees.analysts >= employees.totalAnalystsCapacity ? 'bg-red-500' : 'bg-blue-500'}`}
-                    style={{ width: `${Math.min(100, (employees.analysts / (employees.totalAnalystsCapacity || 1)) * 100)}%` }}
+                    className={`h-full transition-all duration-500 ${safeEmployees.analysts >= safeEmployees.totalAnalystsCapacity ? 'bg-red-500' : 'bg-blue-500'}`}
+                    style={{ width: `${Math.min(100, (safeEmployees.analysts / (safeEmployees.totalAnalystsCapacity || 1)) * 100)}%` }}
                 ></div>
             </div>
-            {employees.analysts >= employees.totalAnalystsCapacity && (
+            {safeEmployees.analysts >= safeEmployees.totalAnalystsCapacity && (
                 <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tighter text-right animate-pulse">
                     Capacidad máxima alcanzada
                 </p>
@@ -100,17 +111,17 @@ export default function Inventory({ facilities, employees }) {
                     <p className="text-xs text-neutral-500 italic">Infiltrándose en las instalaciones enemigas</p>
                 </div>
                 <div className="text-right">
-                    <span className="text-2xl font-black text-blue-400">{employees.saboteurs}</span>
-                    <span className="text-neutral-600 text-lg"> / {employees.totalSaboteursCapacity}</span>
+                    <span className="text-2xl font-black text-blue-400">{safeEmployees.saboteurs}</span>
+                    <span className="text-neutral-600 text-lg"> / {safeEmployees.totalSaboteursCapacity}</span>
                 </div>
             </div>
             <div className="w-full bg-neutral-800 h-2 rounded-full overflow-hidden">
                 <div 
-                    className={`h-full transition-all duration-500 ${employees.saboteurs >= employees.totalSaboteursCapacity ? 'bg-red-500' : 'bg-blue-500'}`}
-                    style={{ width: `${Math.min(100, (employees.saboteurs / (employees.totalSaboteursCapacity || 1)) * 100)}%` }}
+                    className={`h-full transition-all duration-500 ${safeEmployees.saboteurs >= safeEmployees.totalSaboteursCapacity ? 'bg-red-500' : 'bg-blue-500'}`}
+                    style={{ width: `${Math.min(100, (safeEmployees.saboteurs / (safeEmployees.totalSaboteursCapacity || 1)) * 100)}%` }}
                 ></div>
             </div>
-            {employees.saboteurs >= employees.totalSaboteursCapacity && (
+            {safeEmployees.saboteurs >= safeEmployees.totalSaboteursCapacity && (
                 <p className="text-[10px] text-red-500 mt-2 font-bold uppercase tracking-tighter text-right animate-pulse">
                     Capacidad máxima alcanzada
                 </p>

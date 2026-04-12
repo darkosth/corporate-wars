@@ -1,12 +1,17 @@
 import { createClient } from '../../utils/supabase/server'
 import { redirect } from 'next/navigation'
+import { BUILDINGS } from '../../game/constants'
 import prisma from '../../utils/prisma'
 import TopBar from '../../components/TopBar'
-import DashboardControls from '../../components/DashboardControls'
 import Inventory from '../../components/Inventory'
-import { BUILDINGS, EMPLOYEES } from '../../game/constants'
+import DashboardControls from '../../components/DashboardControls'
 import SettingsModal from '@/components/SettingsModal'
 import { syncCompanyEconomy, calculateCompanyStats } from '../../utils/economy'
+import { sanitizeCompany, sanitizeNumber } from '../../utils/company'
+
+function getLevelData(type, level) {
+  return BUILDINGS[type]?.levels?.[level] || BUILDINGS[type]?.levels?.[1]
+}
 
 export default async function DashboardPage({ searchParams }) {
   const params = await searchParams;
@@ -20,8 +25,7 @@ export default async function DashboardPage({ searchParams }) {
 
   // 1. Intentamos obtener la compañía inicialmente
   let company = await prisma.company.findUnique({
-    where: { ownerId: user.id },
-    include: { facilities: true }
+    where: { ownerId: user.id }
   })
 
   // 2. Lógica de creación o sincronización
@@ -32,8 +36,7 @@ export default async function DashboardPage({ searchParams }) {
         companyName: `Corp-${user.id.substring(0, 6).toUpperCase()}`,
         ceoName: "CEO Principal",
         liquidCash: 100000.0,
-      },
-      include: { facilities: true }
+      }
     })
   } else {
     // Sincronizamos la economía (intereses, ingresos pasivos, etc.)
@@ -41,40 +44,42 @@ export default async function DashboardPage({ searchParams }) {
     
     // Refrescamos los datos después de la sincronización para tener valores actuales
     company = await prisma.company.findUnique({
-      where: { id: company.id },
-      include: { facilities: true }
+      where: { id: company.id }
     })
   }
-
   // Si por alguna razón falla el fetch, evitamos el crash
   if (!company) return <div>Error loading company data.</div>
 
+  company = sanitizeCompany(company)
+
   // 3. Cálculos derivados
-  const facilities = company.facilities || []
   const stats = calculateCompanyStats(company)
+  const officeLevelData = getLevelData('OFFICE', company.officeLevel)
+  const datacenterLevelData = getLevelData('DATACENTER', company.datacenterLevel)
+  const basementLevelData = getLevelData('BASEMENT', company.basementLevel)
 
   // Calculamos la capacidad total de programadores basada en las oficinas alquiladas
-  const officeFacilities = facilities.filter(f => f.type === "OFFICE")
-  const totalProgrammersCapacity = officeFacilities.reduce((total, office) => {
-    return total + (office.level * BUILDINGS.OFFICE.capacityPerLevel)
-  }, 0)
+  const officeFacilities = sanitizeNumber(company.officeCount, 0, { min: 0 });
+  const totalProgrammersCapacity = officeFacilities * sanitizeNumber(officeLevelData?.capacity, 0, { min: 0 });
 
   //claculamos la capacidad total de analistas basada en los datacenters alquilados
-  const datacenterFacilities = facilities.filter(f => f.type === "DATACENTER")
-  const totalAnalystsCapacity = datacenterFacilities.reduce((total, datacenter) => {
-    return total + (datacenter.level * BUILDINGS.DATACENTER.capacityPerLevel)
-  }, 0)
+  const datacenterFacilities = sanitizeNumber(company.datacenterCount, 0, { min: 0 });
+  const totalAnalystsCapacity = datacenterFacilities * sanitizeNumber(datacenterLevelData?.capacity, 0, { min: 0 });
 
   // Calculamos la capacidad total de saboteadores basada en los basements alquilados
-  const basementFacilities = facilities.filter(f => f.type === "BASEMENT")
-  const totalSaboteursCapacity = basementFacilities.reduce((total, basement) => {
-    return total + (basement.level * BUILDINGS.BASEMENT.capacityPerLevel)
-  }, 0)
+  const basementFacilities = sanitizeNumber(company.basementCount, 0, { min: 0 });
+  const totalSaboteursCapacity = basementFacilities * sanitizeNumber(basementLevelData?.capacity, 0, { min: 0 });
+
+  const counts = {
+    OFFICE: company.officeCount,
+    DATACENTER: company.datacenterCount,
+    BASEMENT: company.basementCount,
+  }
 
   const capacities = {
-    OFFICE: facilities.filter(f => f.type === "OFFICE").reduce((total, office) => total + (office.level * BUILDINGS.OFFICE.capacityPerLevel), 0),
-    DATACENTER: facilities.filter(f => f.type === "DATACENTER").reduce((total, datacenter) => total + (datacenter.level * BUILDINGS.DATACENTER.capacityPerLevel), 0),
-    BASEMENT: facilities.filter(f => f.type === "BASEMENT").reduce((total, basement) => total + (basement.level * BUILDINGS.BASEMENT.capacityPerLevel), 0),
+    OFFICE: counts.OFFICE * sanitizeNumber(officeLevelData?.capacity, 0, { min: 0 }),
+    DATACENTER: counts.DATACENTER * sanitizeNumber(datacenterLevelData?.capacity, 0, { min: 0 }),
+    BASEMENT: counts.BASEMENT * sanitizeNumber(basementLevelData?.capacity, 0, { min: 0 }),
   }
 
   const employees = {
@@ -89,7 +94,7 @@ export default async function DashboardPage({ searchParams }) {
         companyName={company.companyName} 
         ceoName={company.ceoName}
         initialLiquidCash={company.liquidCash}
-        netFlowPerHour={stats.netFlowPerHour}
+        stats={stats}
       />
 
       <main className="p-6 max-w-7xl mx-auto space-y-8 mt-4">
@@ -98,29 +103,12 @@ export default async function DashboardPage({ searchParams }) {
           <p className="text-neutral-500">Markets never sleep.</p>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-          {/* Gross Revenue Card */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-            <h3 className="text-sm font-medium text-neutral-400 mb-2">Gross Generation</h3>
-            <p className="text-3xl font-bold text-blue-400">
-              +${stats.revenuePerHour.toLocaleString('en-US')} <span className="text-sm font-normal text-neutral-500">/ hr</span>
-            </p>
-          </div>
-
-          {/* Expenses Card */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
-            <h3 className="text-sm font-medium text-neutral-400 mb-2">Operating Expenses</h3>
-            <p className="text-3xl font-bold text-red-400">
-              -${stats.expensesPerHour.toLocaleString('en-US')} <span className="text-sm font-normal text-neutral-500">/ hr</span>
-            </p>
-          </div>
-        </div>
-
         <Inventory 
-          facilities={company.facilities}
+          facilities={{
+            OFFICE: officeFacilities,
+            DATACENTER: datacenterFacilities,
+            BASEMENT: basementFacilities
+          }}
           employees={{
             programmers: employees.PROGRAMMER,
             totalProgrammersCapacity: totalProgrammersCapacity,
@@ -128,13 +116,18 @@ export default async function DashboardPage({ searchParams }) {
             totalAnalystsCapacity: totalAnalystsCapacity,
             saboteurs: employees.SABOTEUR,
             totalSaboteursCapacity: totalSaboteursCapacity,
-          }} 
+          }}
         />
 
         <DashboardControls 
         liquidCash={company.liquidCash}
         employees={employees}
         capacities={capacities}
+        levels={{
+          OFFICE: company.officeLevel || 1, 
+          DATACENTER: company.datacenterLevel || 1,
+          BASEMENT: company.basementLevel || 1,
+        }}
         />
       </main>
 

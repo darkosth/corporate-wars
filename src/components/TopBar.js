@@ -2,21 +2,30 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { sanitizeNumber } from '../utils/company'
 
-export default function TopBar({ companyName, ceoName, initialLiquidCash, netFlowPerHour }) {
-  const [currentCash, setCurrentCash] = useState(initialLiquidCash)
+const formatMoney = (value) => Math.floor(sanitizeNumber(value, 0)).toLocaleString('en-US')
+
+export default function TopBar({ companyName, ceoName, initialLiquidCash, stats }) {
+  const safeInitialCash = sanitizeNumber(initialLiquidCash, 0, { min: 0 })
+  const safeStats = {
+    revenuePerHour: sanitizeNumber(stats?.revenuePerHour, 0),
+    expensesPerHour: sanitizeNumber(stats?.expensesPerHour, 0),
+    netFlowPerHour: sanitizeNumber(stats?.netFlowPerHour, 0)
+  }
+  const [currentCash, setCurrentCash] = useState(safeInitialCash)
 
   useEffect(() => {
-    const cashPerSecond = netFlowPerHour / 3600
+    const cashPerSecond = safeStats.netFlowPerHour / 3600
     const timer = setInterval(() => {
-      setCurrentCash(prevCash => prevCash + cashPerSecond)
+      setCurrentCash((cash) => cash + cashPerSecond)
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [netFlowPerHour])
+  }, [safeStats.netFlowPerHour])
 
   // Determinamos si estamos en ganancias o pérdidas para el estilo visual
-  const isPositive = netFlowPerHour >= 0
+  const isPositive = safeStats.netFlowPerHour >= 0
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-neutral-950 border-b border-neutral-800 shadow-md">
@@ -32,13 +41,23 @@ export default function TopBar({ companyName, ceoName, initialLiquidCash, netFlo
 
           <div className="flex items-center gap-4">
             
+            {/*Gross Generation*/}
+            <div className={`flex flex-col items-end px-3 py-1 rounded border ${isPositive ? 'border-emerald-900/50 bg-emerald-950/20' : 'border-red-900/50 bg-red-950/20'}`}>
+              <span className="text-[9px] uppercase tracking-widest font-bold text-neutral-500">
+                Gross Generation
+              </span>
+              <span className={`text-sm font-bold font-mono ${isPositive ? 'text-blue-500' : 'text-red-500'}`}>
+                {isPositive ? '+' : ''}${formatMoney(safeStats.revenuePerHour)}/h
+              </span>
+            </div>
+
             {/*Operating Expenses*/}
             <div className={`flex flex-col items-end px-3 py-1 rounded border ${isPositive ? 'border-emerald-900/50 bg-emerald-950/20' : 'border-red-900/50 bg-red-950/20'}`}>
               <span className="text-[9px] uppercase tracking-widest font-bold text-neutral-500">
                 Operating Expenses
               </span>
-              <span className={`text-sm font-bold font-mono ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-                {isPositive ? '-' : ''}${Math.floor(netFlowPerHour).toLocaleString('en-US')}/h
+              <span className={`text-sm font-bold font-mono ${!isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                {isPositive ? '-' : ''}${formatMoney(safeStats.expensesPerHour)}/h
               </span>
             </div>
 
@@ -48,7 +67,7 @@ export default function TopBar({ companyName, ceoName, initialLiquidCash, netFlo
                 Net Flow
               </span>
               <span className={`text-sm font-bold font-mono ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-                {isPositive ? '+' : ''}${Math.floor(netFlowPerHour).toLocaleString('en-US')}/h
+                {isPositive ? '+' : ''}${formatMoney(safeStats.netFlowPerHour)}/h
               </span>
             </div>
 
@@ -58,7 +77,7 @@ export default function TopBar({ companyName, ceoName, initialLiquidCash, netFlo
                 Bóveda
               </span>
               <span className="text-xl font-mono font-bold text-white tracking-tighter">
-                ${Math.floor(currentCash).toLocaleString('en-US')}
+                ${formatMoney(currentCash)}
               </span>
             </div>
 

@@ -12,7 +12,6 @@ model Company {
   ownerId         String   @unique
   companyName     String   @unique
   ceoName         String   @default("Nuevo CEO")
-  hqLevel         Int      @default(1)
   
   // Finanzas Base
   liquidCash      Float    @default(100000.0)
@@ -23,18 +22,16 @@ model Company {
   saboteurs       Int      @default(0) // Ataque
 
   //Infraestructura
-  facilities      Facility[] 
-  
+  officeCount     Int      @default(0)
+  datacenterCount Int      @default(0)
+  basementCount   Int      @default(0)
+
+  //Nivel tecnologico global
+  hqLevel         Int      @default(1)
+  officeLevel     Int      @default(1)
+  datacenterLevel Int      @default(1)
+  basementLevel   Int      @default(1)
+    
   lastUpdated     DateTime @default(now())
   createdAt       DateTime @default(now())
-}
-
-//El inventario de edificios de cada jugador
-model Facility {
-  id          String   @id @default(uuid())
-  companyId   String
-  type        String   // "OFFICE", "DATACENTER", "BASEMENT"
-  level       Int      @default(1)
-  
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }

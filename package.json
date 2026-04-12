@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sanitize:companies": "node scripts/sanitize-companies.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.7.0",

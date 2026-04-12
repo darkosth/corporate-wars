@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { buyFacility, hireStaff } from '../app/dashboard/actions'
 import { BUILDINGS, EMPLOYEES } from '../game/constants' 
+import { sanitizeNumber } from '../utils/company'
 
 const Spinner = () => (
   <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
@@ -11,6 +12,8 @@ const Spinner = () => (
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
   </svg>
 )
+
+const formatAmount = (value, options = {}) => sanitizeNumber(value, 0, options).toLocaleString('en-US')
 
 // COMPONENTE DE UI: La Tarjeta de Compra/Contratación
 const ActionCard = ({ title, subtitle, emoji, cost, revenue, expense, onAction, isLoading, isDisabled, buttonText }) => (
@@ -32,21 +35,21 @@ const ActionCard = ({ title, subtitle, emoji, cost, revenue, expense, onAction, 
     <div className="space-y-2 mb-6 bg-neutral-950/50 p-3 rounded-lg border border-neutral-800/50">
       <div className="flex justify-between items-center">
         <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Costo Inicial</span>
-        <span className="text-sm font-mono text-white">${cost.toLocaleString('en-US')}</span>
+        <span className="text-sm font-mono text-white">${formatAmount(cost, { min: 0 })}</span>
       </div>
       <div className="flex justify-between items-center">
         <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Ganancias Generadas </span>
-        <span className="text-sm font-mono text-white">${revenue.toLocaleString('en-US')}</span>
+        <span className="text-sm font-mono text-white">${formatAmount(revenue, { min: 0 })}</span>
       </div>
       <div className="flex justify-between items-center">
         <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Costo de Operación</span>
-        <span className="text-sm font-mono text-white">${expense.toLocaleString('en-US')}</span>
+        <span className="text-sm font-mono text-white">${formatAmount(expense, { min: 0 })}</span>
       </div>
-      {(revenue > 0 || expense > 0) && (
+      {(sanitizeNumber(revenue, 0) > 0 || sanitizeNumber(expense, 0) > 0) && (
         <div className="flex justify-between items-center border-t border-neutral-800/50 pt-2 mt-2">
           <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Flujo Neto</span>
-          <span className={`text-sm font-mono ${revenue - expense >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {revenue - expense >= 0 ? '+' : ''}${(revenue - expense).toLocaleString('en-US')}/h
+          <span className={`text-sm font-mono ${sanitizeNumber(revenue, 0) - sanitizeNumber(expense, 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            {sanitizeNumber(revenue, 0) - sanitizeNumber(expense, 0) >= 0 ? '+' : ''}${formatAmount(sanitizeNumber(revenue, 0) - sanitizeNumber(expense, 0))}/h
           </span>
         </div>
       )}
@@ -64,7 +67,7 @@ const ActionCard = ({ title, subtitle, emoji, cost, revenue, expense, onAction, 
   </div>
 )
 
-export default function DashboardControls({ liquidCash, employees, capacities }) {
+export default function DashboardControls({ liquidCash, employees, capacities, levels }) {
   const [error, setError] = useState(null)
   const [loadingStates, setLoadingStates] = useState({
     office: false,
@@ -75,32 +78,56 @@ export default function DashboardControls({ liquidCash, employees, capacities })
     saboteur: false
   })
 
+  
   const executeAction = async (actionFn, actionKey) => {
     setLoadingStates(prev => ({ ...prev, [actionKey]: true }))
     const result = await actionFn()
     
     if (result?.error) setError(result.error)
-    else setError(null)
+      else setError(null)
     
     setLoadingStates(prev => ({ ...prev, [actionKey]: false }))
   }
-
+  
   const isAnyLoading = Object.values(loadingStates).some(state => state)
+  
+  const safeLevels = {
+    OFFICE: sanitizeNumber(levels?.OFFICE, 1, { min: 1 }),
+    DATACENTER: sanitizeNumber(levels?.DATACENTER, 1, { min: 1 }),
+    BASEMENT: sanitizeNumber(levels?.BASEMENT, 1, { min: 1 })
+  }
+
+  //DATOS SEGUN NIVELES 
+  const officeData = BUILDINGS.OFFICE.levels[safeLevels.OFFICE] || BUILDINGS.OFFICE.levels[1]
+  const dataCenterData = BUILDINGS.DATACENTER.levels[safeLevels.DATACENTER] || BUILDINGS.DATACENTER.levels[1]
+  const basementData = BUILDINGS.BASEMENT.levels[safeLevels.BASEMENT] || BUILDINGS.BASEMENT.levels[1]
+
+  const safeLiquidCash = sanitizeNumber(liquidCash, 0, { min: 0 })
+  const safeEmployees = {
+    PROGRAMMER: sanitizeNumber(employees?.PROGRAMMER, 0, { min: 0 }),
+    ANALYST: sanitizeNumber(employees?.ANALYST, 0, { min: 0 }),
+    SABOTEUR: sanitizeNumber(employees?.SABOTEUR, 0, { min: 0 })
+  }
+  const safeCapacities = {
+    OFFICE: sanitizeNumber(capacities?.OFFICE, 0, { min: 0 }),
+    DATACENTER: sanitizeNumber(capacities?.DATACENTER, 0, { min: 0 }),
+    BASEMENT: sanitizeNumber(capacities?.BASEMENT, 0, { min: 0 })
+  }
 
   //VALIDACIONES DE INFRAESTRUCTURA
-  const canAffordOffice = liquidCash >= BUILDINGS.OFFICE.basePrice
-  const canAffordDataCenter = liquidCash >= BUILDINGS.DATACENTER.basePrice
-  const canAffordBasement = liquidCash >= BUILDINGS.BASEMENT.basePrice
+  const canAffordOffice = safeLiquidCash >= BUILDINGS.OFFICE.basePrice
+  const canAffordDataCenter = safeLiquidCash >= BUILDINGS.DATACENTER.basePrice
+  const canAffordBasement = safeLiquidCash >= BUILDINGS.BASEMENT.basePrice
 
   // VALIDACIONES DE CAPITAL HUMANO (Dinero + Capacidad)
-  const canAffordProgrammer = liquidCash >= EMPLOYEES.PROGRAMMER.costToHire    //EMPLOYEES en mayuscula viene de las constantes, no del estado
-  const hasspaceForProgrammer = employees.PROGRAMMER < capacities.OFFICE      //employees en minuscula viene del estado que se pasa como prop
+  const canAffordProgrammer = safeLiquidCash >= EMPLOYEES.PROGRAMMER.costToHire
+  const hasspaceForProgrammer = safeEmployees.PROGRAMMER < safeCapacities.OFFICE
 
-  const canAffordAnalyst = liquidCash >= EMPLOYEES.ANALYST.costToHire         
-  const hasSpaceForAnalyst = employees.ANALYST < capacities.DATACENTER
+  const canAffordAnalyst = safeLiquidCash >= EMPLOYEES.ANALYST.costToHire
+  const hasSpaceForAnalyst = safeEmployees.ANALYST < safeCapacities.DATACENTER
 
-  const canAffordSaboteur = liquidCash >= EMPLOYEES.SABOTEUR.costToHire
-  const hasSpaceForSaboteur = employees.SABOTEUR < capacities.BASEMENT
+  const canAffordSaboteur = safeLiquidCash >= EMPLOYEES.SABOTEUR.costToHire
+  const hasSpaceForSaboteur = safeEmployees.SABOTEUR < safeCapacities.BASEMENT
 
   return (
     <div className="pt-8">
@@ -120,12 +147,12 @@ export default function DashboardControls({ liquidCash, employees, capacities })
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <ActionCard 
-            title={BUILDINGS.OFFICE.name}
+            title={`${BUILDINGS.OFFICE.name} (Lv. ${safeLevels.OFFICE})`}
             subtitle={BUILDINGS.OFFICE.description}
             emoji={BUILDINGS.OFFICE.emoji}
             cost={BUILDINGS.OFFICE.basePrice}
-            revenue={BUILDINGS.OFFICE.baseRevenue}
-            expense={BUILDINGS.OFFICE.baseMaintenance}
+            revenue={officeData.revenue}
+            expense={officeData.maintenance}
             onAction={() => executeAction(() => buyFacility('OFFICE'), 'office')}
             isLoading={loadingStates.office}
             isDisabled={isAnyLoading || !canAffordOffice}
@@ -133,12 +160,12 @@ export default function DashboardControls({ liquidCash, employees, capacities })
           />
 
           <ActionCard 
-            title={BUILDINGS.DATACENTER.name}
+            title={`${BUILDINGS.DATACENTER.name} (Lv. ${safeLevels.DATACENTER})`}
             subtitle={BUILDINGS.DATACENTER.description}
             emoji={BUILDINGS.DATACENTER.emoji}
             cost={BUILDINGS.DATACENTER.basePrice}
-            revenue={BUILDINGS.DATACENTER.baseRevenue}
-            expense={BUILDINGS.DATACENTER.baseMaintenance}
+            revenue={dataCenterData.revenue}
+            expense={dataCenterData.maintenance}
             onAction={() => executeAction(() => buyFacility('DATACENTER'), 'dataCenter')}
             isLoading={loadingStates.dataCenter}
             isDisabled={isAnyLoading || !canAffordDataCenter}
@@ -146,12 +173,12 @@ export default function DashboardControls({ liquidCash, employees, capacities })
           />
 
           <ActionCard 
-            title={BUILDINGS.BASEMENT.name}
+            title={`${BUILDINGS.BASEMENT.name} (Lv. ${safeLevels.BASEMENT})`}
             subtitle={BUILDINGS.BASEMENT.description}
             emoji={BUILDINGS.BASEMENT.emoji}
             cost={BUILDINGS.BASEMENT.basePrice}
-            revenue={BUILDINGS.BASEMENT.baseRevenue}
-            expense={BUILDINGS.BASEMENT.baseMaintenance}
+            revenue={basementData.revenue}
+            expense={basementData.maintenance}
             onAction={() => executeAction(() => buyFacility('BASEMENT'), 'basement')}
             isLoading={loadingStates.basement}
             isDisabled={isAnyLoading || !canAffordBasement}
