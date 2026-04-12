@@ -1,105 +1,150 @@
-// src/app/dashboard/page.js
 import { createClient } from '../../utils/supabase/server'
 import { redirect } from 'next/navigation'
 import prisma from '../../utils/prisma'
+import TopBar from '../../components/TopBar'
+import DashboardControls from '../../components/DashboardControls'
+import Inventory from '../../components/Inventory'
+import { BUILDINGS, EMPLOYEES } from '../../game/constants'
+import SettingsModal from '@/components/SettingsModal'
+import { syncCompanyEconomy, calculateCompanyStats } from '../../utils/economy'
 
-export default async function DashboardPage() {
-  // 1. Verificamos quién está intentando entrar
+export default async function DashboardPage({ searchParams }) {
+  const params = await searchParams;
+  const ShowSettings = params.settings === 'true'
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
 
-  // Si no está logueado, patada de vuelta al login
   if (error || !user) {
     redirect('/login')
   }
 
-  // 2. Buscamos su empresa en la base de datos
+  // 1. Intentamos obtener la compañía inicialmente
   let company = await prisma.company.findUnique({
-    where: { ownerId: user.id }
+    where: { ownerId: user.id },
+    include: { facilities: true }
   })
 
-  // 3. Si es nuevo y no tiene empresa, ¡se la creamos al instante!
+  // 2. Lógica de creación o sincronización
   if (!company) {
     company = await prisma.company.create({
       data: {
         ownerId: user.id,
-        // Le damos un nombre temporal usando parte de su ID
         companyName: `Corp-${user.id.substring(0, 6).toUpperCase()}`,
-        liquidCash: 100000.0, // El capital semilla
-        revenuePerHour: 1500.0, // El trabajo del CEO
-        expensesPerHour: 0.0,
-      }
+        ceoName: "CEO Principal",
+        liquidCash: 100000.0,
+      },
+      include: { facilities: true }
+    })
+  } else {
+    // Sincronizamos la economía (intereses, ingresos pasivos, etc.)
+    await syncCompanyEconomy(user.id)
+    
+    // Refrescamos los datos después de la sincronización para tener valores actuales
+    company = await prisma.company.findUnique({
+      where: { id: company.id },
+      include: { facilities: true }
     })
   }
 
-  // 4. La Interfaz Visual (Tu Cuartel General)
+  // Si por alguna razón falla el fetch, evitamos el crash
+  if (!company) return <div>Error loading company data.</div>
+
+  // 3. Cálculos derivados
+  const facilities = company.facilities || []
+  const stats = calculateCompanyStats(company)
+
+  // Calculamos la capacidad total de programadores basada en las oficinas alquiladas
+  const officeFacilities = facilities.filter(f => f.type === "OFFICE")
+  const totalProgrammersCapacity = officeFacilities.reduce((total, office) => {
+    return total + (office.level * BUILDINGS.OFFICE.capacityPerLevel)
+  }, 0)
+
+  //claculamos la capacidad total de analistas basada en los datacenters alquilados
+  const datacenterFacilities = facilities.filter(f => f.type === "DATACENTER")
+  const totalAnalystsCapacity = datacenterFacilities.reduce((total, datacenter) => {
+    return total + (datacenter.level * BUILDINGS.DATACENTER.capacityPerLevel)
+  }, 0)
+
+  // Calculamos la capacidad total de saboteadores basada en los basements alquilados
+  const basementFacilities = facilities.filter(f => f.type === "BASEMENT")
+  const totalSaboteursCapacity = basementFacilities.reduce((total, basement) => {
+    return total + (basement.level * BUILDINGS.BASEMENT.capacityPerLevel)
+  }, 0)
+
+  const capacities = {
+    OFFICE: facilities.filter(f => f.type === "OFFICE").reduce((total, office) => total + (office.level * BUILDINGS.OFFICE.capacityPerLevel), 0),
+    DATACENTER: facilities.filter(f => f.type === "DATACENTER").reduce((total, datacenter) => total + (datacenter.level * BUILDINGS.DATACENTER.capacityPerLevel), 0),
+    BASEMENT: facilities.filter(f => f.type === "BASEMENT").reduce((total, basement) => total + (basement.level * BUILDINGS.BASEMENT.capacityPerLevel), 0),
+  }
+
+  const employees = {
+    PROGRAMMER: company.programmers,
+    ANALYST: company.analysts,
+    SABOTEUR: company.saboteurs
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-300 font-sans">
-      
-      {/* Barra Superior */}
-      <nav className="border-b border-neutral-800 bg-neutral-900 px-6 py-4 flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-widest">{company.companyName}</h1>
-          <p className="text-xs text-neutral-500">CEO: {user.email}</p>
-        </div>
-        <form action="/auth/signout" method="post">
-          <button className="text-sm bg-neutral-800 hover:bg-neutral-700 px-4 py-2 rounded transition-colors text-red-400">
-            Desconectar
-          </button>
-        </form>
-      </nav>
+      <TopBar 
+        companyName={company.companyName} 
+        ceoName={company.ceoName}
+        initialLiquidCash={company.liquidCash}
+        netFlowPerHour={stats.netFlowPerHour}
+      />
 
-      {/* Panel Principal */}
-      <main className="p-6 max-w-6xl mx-auto space-y-6 mt-8">
-        
-        <header className="mb-10">
-          <h2 className="text-3xl font-light text-white">Resumen Financiero</h2>
-          <p className="text-neutral-500">Los mercados nunca duermen.</p>
+      <main className="p-6 max-w-7xl mx-auto space-y-8 mt-4">
+        <header className="mb-8">
+          <h2 className="text-3xl font-light text-white">Financial Summary</h2>
+          <p className="text-neutral-500">Markets never sleep.</p>
         </header>
 
-        {/* Tarjetas de Economía */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Tarjeta de Liquidez */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 shadow-lg relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-1 h-full bg-green-500"></div>
-            <h3 className="text-sm font-medium text-neutral-400 mb-2">Liquidez Neta (Bóveda)</h3>
-            <p className="text-4xl font-bold text-white">
-              ${company.liquidCash.toLocaleString('en-US')}
-            </p>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-          {/* Tarjeta de Ingresos */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 shadow-lg relative overflow-hidden">
+          {/* Gross Revenue Card */}
+          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-            <h3 className="text-sm font-medium text-neutral-400 mb-2">Generación Bruta</h3>
+            <h3 className="text-sm font-medium text-neutral-400 mb-2">Gross Generation</h3>
             <p className="text-3xl font-bold text-blue-400">
-              +${company.revenuePerHour.toLocaleString('en-US')} <span className="text-sm font-normal text-neutral-500">/ hora</span>
+              +${stats.revenuePerHour.toLocaleString('en-US')} <span className="text-sm font-normal text-neutral-500">/ hr</span>
             </p>
           </div>
 
-          {/* Tarjeta de Gastos */}
-          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 shadow-lg relative overflow-hidden">
+          {/* Expenses Card */}
+          <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
-            <h3 className="text-sm font-medium text-neutral-400 mb-2">Gastos Operativos (Salarios)</h3>
+            <h3 className="text-sm font-medium text-neutral-400 mb-2">Operating Expenses</h3>
             <p className="text-3xl font-bold text-red-400">
-              -${company.expensesPerHour.toLocaleString('en-US')} <span className="text-sm font-normal text-neutral-500">/ hora</span>
+              -${stats.expensesPerHour.toLocaleString('en-US')} <span className="text-sm font-normal text-neutral-500">/ hr</span>
             </p>
           </div>
-
         </div>
 
-        {/* Botones de acción falsos para el MVP */}
-        <div className="pt-8 flex gap-4">
-          <button className="bg-neutral-800 border border-neutral-700 hover:border-neutral-500 text-white px-6 py-3 rounded opacity-50 cursor-not-allowed">
-            Alquilar Oficina (-$15,000)
-          </button>
-          <button className="bg-neutral-800 border border-neutral-700 hover:border-neutral-500 text-white px-6 py-3 rounded opacity-50 cursor-not-allowed">
-            Contratar Programador (-$800/h)
-          </button>
-        </div>
+        <Inventory 
+          facilities={company.facilities}
+          employees={{
+            programmers: employees.PROGRAMMER,
+            totalProgrammersCapacity: totalProgrammersCapacity,
+            analysts: employees.ANALYST,
+            totalAnalystsCapacity: totalAnalystsCapacity,
+            saboteurs: employees.SABOTEUR,
+            totalSaboteursCapacity: totalSaboteursCapacity,
+          }} 
+        />
 
+        <DashboardControls 
+        liquidCash={company.liquidCash}
+        employees={employees}
+        capacities={capacities}
+        />
       </main>
+
+      { ShowSettings && (
+        <SettingsModal
+          currentCompany={ company.companyName }
+          currentCeo={ company.ceoName }
+          isOpen={true}
+        />
+      )}
     </div>
   )
 }
