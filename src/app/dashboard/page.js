@@ -1,6 +1,6 @@
 import { createClient } from '../../utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { BUILDINGS } from '../../game/constants'
+import { BUILDINGS, OFFICES_PER_HQ } from '../../game/constants'
 import prisma from '../../utils/prisma'
 import TopBar from '../../components/TopBar'
 import Inventory from '../../components/Inventory'
@@ -54,13 +54,16 @@ export default async function DashboardPage({ searchParams }) {
 
   // 3. Cálculos derivados
   const stats = calculateCompanyStats(company)
+  const hqLevelData = getLevelData('HQ', company.hqLevel)
   const officeLevelData = getLevelData('OFFICE', company.officeLevel)
   const datacenterLevelData = getLevelData('DATACENTER', company.datacenterLevel)
   const basementLevelData = getLevelData('BASEMENT', company.basementLevel)
 
   // Calculamos la capacidad total de programadores basada en las oficinas alquiladas
+  const hqFacilities = sanitizeNumber(company.hqCount, 0, { min: 0 });
   const officeFacilities = sanitizeNumber(company.officeCount, 0, { min: 0 });
   const totalProgrammersCapacity = officeFacilities * sanitizeNumber(officeLevelData?.capacity, 0, { min: 0 });
+  const totalOfficeSlotsUnlocked = hqFacilities * OFFICES_PER_HQ
 
   //claculamos la capacidad total de analistas basada en los datacenters alquilados
   const datacenterFacilities = sanitizeNumber(company.datacenterCount, 0, { min: 0 });
@@ -71,12 +74,14 @@ export default async function DashboardPage({ searchParams }) {
   const totalSaboteursCapacity = basementFacilities * sanitizeNumber(basementLevelData?.capacity, 0, { min: 0 });
 
   const counts = {
+    HQ: company.hqCount,
     OFFICE: company.officeCount,
     DATACENTER: company.datacenterCount,
     BASEMENT: company.basementCount,
   }
 
   const capacities = {
+    HQ: counts.HQ * sanitizeNumber(hqLevelData?.capacity, 0, { min: 0 }),
     OFFICE: counts.OFFICE * sanitizeNumber(officeLevelData?.capacity, 0, { min: 0 }),
     DATACENTER: counts.DATACENTER * sanitizeNumber(datacenterLevelData?.capacity, 0, { min: 0 }),
     BASEMENT: counts.BASEMENT * sanitizeNumber(basementLevelData?.capacity, 0, { min: 0 }),
@@ -105,6 +110,7 @@ export default async function DashboardPage({ searchParams }) {
 
         <Inventory 
           facilities={{
+            HQ: hqFacilities,
             OFFICE: officeFacilities,
             DATACENTER: datacenterFacilities,
             BASEMENT: basementFacilities
@@ -116,14 +122,18 @@ export default async function DashboardPage({ searchParams }) {
             totalAnalystsCapacity: totalAnalystsCapacity,
             saboteurs: employees.SABOTEUR,
             totalSaboteursCapacity: totalSaboteursCapacity,
+            totalOfficeSlotsUnlocked,
           }}
         />
 
         <DashboardControls 
         liquidCash={company.liquidCash}
+        facilities={counts}
         employees={employees}
         capacities={capacities}
+        officeSlotsUnlocked={totalOfficeSlotsUnlocked}
         levels={{
+          HQ: company.hqLevel || 1,
           OFFICE: company.officeLevel || 1, 
           DATACENTER: company.datacenterLevel || 1,
           BASEMENT: company.basementLevel || 1,

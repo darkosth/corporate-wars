@@ -4,11 +4,12 @@
 import { createClient } from '../../utils/supabase/server'
 import prisma from '../../utils/prisma'
 import { revalidatePath } from 'next/cache'
-import { BUILDINGS, EMPLOYEES } from '../../game/constants'
+import { BUILDINGS, EMPLOYEES, OFFICES_PER_HQ } from '../../game/constants'
 import { sanitizeCompany, sanitizeNumber } from '../../utils/company'
 
 // Mapeo para conectar los tipos de constantes con los campos de la DB
 const buildingFieldMap = {
+  HQ: 'hqCount',
   OFFICE: 'officeCount',
   DATACENTER: 'datacenterCount',
   BASEMENT: 'basementCount'
@@ -45,6 +46,14 @@ export async function buyFacility(type) {
 
     if (company.liquidCash < buildingData.basePrice) {
       return { error: `Fondos insuficientes para ${buildingData.name}.` }
+    }
+
+    if (type === 'OFFICE') {
+      const availableOfficeSlots = sanitizeNumber(company.hqCount, 0, { min: 0 }) * OFFICES_PER_HQ
+
+      if (company.officeCount >= availableOfficeSlots) {
+        return { error: "Necesitas comprar otro HQ para habilitar más oficinas." }
+      }
     }
 
     // Ejecutamos la transacción: Restar dinero e incrementar contador

@@ -22,6 +22,7 @@ model Company {
   saboteurs       Int      @default(0) // Ataque
 
   //Infraestructura
+  hqCount         Int      @default(0)
   officeCount     Int      @default(0)
   datacenterCount Int      @default(0)
   basementCount   Int      @default(0)

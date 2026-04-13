@@ -34,6 +34,7 @@ function getCompanySanitizationData(company) {
     programmers: sanitizeInteger(company.programmers, 0, { min: 0 }),
     analysts: sanitizeInteger(company.analysts, 0, { min: 0 }),
     saboteurs: sanitizeInteger(company.saboteurs, 0, { min: 0 }),
+    hqCount: sanitizeInteger(company.hqCount, 0, { min: 0 }),
     officeCount: sanitizeInteger(company.officeCount, 0, { min: 0 }),
     datacenterCount: sanitizeInteger(company.datacenterCount, 0, { min: 0 }),
     basementCount: sanitizeInteger(company.basementCount, 0, { min: 0 }),

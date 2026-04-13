@@ -16,6 +16,10 @@ export default function TopBar({ companyName, ceoName, initialLiquidCash, stats 
   const [currentCash, setCurrentCash] = useState(safeInitialCash)
 
   useEffect(() => {
+    setCurrentCash(safeInitialCash)
+  }, [safeInitialCash])
+
+  useEffect(() => {
     const cashPerSecond = safeStats.netFlowPerHour / 3600
     const timer = setInterval(() => {
       setCurrentCash((cash) => cash + cashPerSecond)

@@ -24,6 +24,7 @@ export function calculateCompanyStats(company) {
   const programmers = safeCompany.programmers;
   const analysts = safeCompany.analysts;
   const saboteurs = safeCompany.saboteurs;
+  const hqCount = safeCompany.hqCount;
   const officeCount = safeCompany.officeCount;
   const datacenterCount = safeCompany.datacenterCount;
   const basementCount = safeCompany.basementCount;
@@ -46,9 +47,13 @@ export function calculateCompanyStats(company) {
   let totalRevenue = BASE_REVENUE + totalEmployeeRevenue;
   let totalExpenses = totalEmployeeExpenses;
 
+  const hqLevelData = getBuildingLevelData('HQ', safeCompany.hqLevel);
   const officeLevelData = getBuildingLevelData('OFFICE', safeCompany.officeLevel);
   const datacenterLevelData = getBuildingLevelData('DATACENTER', safeCompany.datacenterLevel);
   const basementLevelData = getBuildingLevelData('BASEMENT', safeCompany.basementLevel);
+
+  totalExpenses += hqCount * sanitizeNumber(hqLevelData?.maintenance, 0, { min: 0 });
+  totalRevenue += hqCount * sanitizeNumber(hqLevelData?.revenue, 0, { min: 0 });
 
   totalExpenses += officeCount * sanitizeNumber(officeLevelData?.maintenance, 0, { min: 0 });
   totalRevenue += officeCount * sanitizeNumber(officeLevelData?.revenue, 0, { min: 0 });
