@@ -1,6 +1,3 @@
-
-export const OFFICES_PER_HQ = 5
-
 export const BUILDINGS = {
   HQ: {
     id: "HQ",
@@ -9,11 +6,11 @@ export const BUILDINGS = {
     emoji: "🏛️",
     basePrice: 50000,
     levels: {
-      1: { upgradeCost: 0, maintenance: 350, revenue: 900, capacity: 0 },
-      2: { upgradeCost: 100000, maintenance: 600, revenue: 1800, capacity: 0 },
-      3: { upgradeCost: 200000, maintenance: 1000, revenue: 3600, capacity: 0 },
-      4: { upgradeCost: 400000, maintenance: 1700, revenue: 6500, capacity: 0 },
-      5: { upgradeCost: 800000, maintenance: 2800, revenue: 11000, capacity: 0 },
+      1: { upgradeCost: 0, maintenance: 350, revenue: 900, capacity: 5 },
+      2: { upgradeCost: 100000, maintenance: 600, revenue: 1800, capacity: 10 },
+      3: { upgradeCost: 200000, maintenance: 1000, revenue: 3600, capacity: 20 },
+      4: { upgradeCost: 400000, maintenance: 1700, revenue: 6500, capacity: 40 },
+      5: { upgradeCost: 800000, maintenance: 2800, revenue: 11000, capacity: 80 },
     }
   },
   OFFICE: {

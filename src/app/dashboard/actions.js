@@ -1,10 +1,9 @@
-// src/app/dashboard/actions.js
 'use server'
 
 import { createClient } from '../../utils/supabase/server'
 import prisma from '../../utils/prisma'
 import { revalidatePath } from 'next/cache'
-import { BUILDINGS, EMPLOYEES, OFFICES_PER_HQ } from '../../game/constants'
+import { BUILDINGS, EMPLOYEES } from '../../game/constants'
 import { sanitizeCompany, sanitizeNumber } from '../../utils/company'
 
 // Mapeo para conectar los tipos de constantes con los campos de la DB
@@ -48,11 +47,20 @@ export async function buyFacility(type) {
       return { error: `Fondos insuficientes para ${buildingData.name}.` }
     }
 
-    if (type === 'OFFICE') {
-      const availableOfficeSlots = sanitizeNumber(company.hqCount, 0, { min: 0 }) * OFFICES_PER_HQ
+    if (type !== 'HQ') {
+      const hqLevel = sanitizeNumber(company.hqLevel, 1, { min: 1, max: 5 })
+      const hqCapacity = sanitizeNumber(
+        BUILDINGS.HQ.levels?.[hqLevel]?.capacity ?? BUILDINGS.HQ.levels?.[1]?.capacity,
+        0,
+        { min: 0 }
+      )
+      const totalBuildings =
+        sanitizeNumber(company.officeCount, 0, { min: 0 }) +
+        sanitizeNumber(company.datacenterCount, 0, { min: 0 }) +
+        sanitizeNumber(company.basementCount, 0, { min: 0 })
 
-      if (company.officeCount >= availableOfficeSlots) {
-        return { error: "Necesitas comprar otro HQ para habilitar más oficinas." }
+      if (totalBuildings >= hqCapacity * sanitizeNumber(company.hqCount, 0, { min: 0 })) {
+        return { error: "El HQ no tiene capacidad para más edificios. Sube de nivel el HQ o compra uno nuevo." }
       }
     }
 

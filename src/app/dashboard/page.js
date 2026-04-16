@@ -1,6 +1,6 @@
 import { createClient } from '../../utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { BUILDINGS, OFFICES_PER_HQ } from '../../game/constants'
+import { BUILDINGS } from '../../game/constants'
 import prisma from '../../utils/prisma'
 import TopBar from '../../components/TopBar'
 import Inventory from '../../components/Inventory'
@@ -59,17 +59,18 @@ export default async function DashboardPage({ searchParams }) {
   const datacenterLevelData = getLevelData('DATACENTER', company.datacenterLevel)
   const basementLevelData = getLevelData('BASEMENT', company.basementLevel)
 
+  // Calculamos la cantidad total de slots de edificios desbloqueados por los HQs
+  const hqFacilitiesAvailables = sanitizeNumber(company.hqCount, 0, { min: 0 });
+
   // Calculamos la capacidad total de programadores basada en las oficinas alquiladas
-  const hqFacilities = sanitizeNumber(company.hqCount, 0, { min: 0 });
   const officeFacilities = sanitizeNumber(company.officeCount, 0, { min: 0 });
   const totalProgrammersCapacity = officeFacilities * sanitizeNumber(officeLevelData?.capacity, 0, { min: 0 });
-  const totalOfficeSlotsUnlocked = hqFacilities * OFFICES_PER_HQ
 
-  //claculamos la capacidad total de analistas basada en los datacenters alquilados
+  //claculamos la capacidad total de analistas basada en los Datacenters alquilados
   const datacenterFacilities = sanitizeNumber(company.datacenterCount, 0, { min: 0 });
   const totalAnalystsCapacity = datacenterFacilities * sanitizeNumber(datacenterLevelData?.capacity, 0, { min: 0 });
 
-  // Calculamos la capacidad total de saboteadores basada en los basements alquilados
+  // Calculamos la capacidad total de saboteadores basada en los Basements alquilados
   const basementFacilities = sanitizeNumber(company.basementCount, 0, { min: 0 });
   const totalSaboteursCapacity = basementFacilities * sanitizeNumber(basementLevelData?.capacity, 0, { min: 0 });
 
@@ -109,20 +110,20 @@ export default async function DashboardPage({ searchParams }) {
         </header>
 
         <Inventory 
-          facilities={{
-            HQ: hqFacilities,
+          availablesFacilities={{
+            HQ: hqFacilitiesAvailables,
+            HQCapacity: hqLevelData?.capacity || 0,
             OFFICE: officeFacilities,
             DATACENTER: datacenterFacilities,
             BASEMENT: basementFacilities
           }}
-          employees={{
+          availablesEmployees={{
             programmers: employees.PROGRAMMER,
             totalProgrammersCapacity: totalProgrammersCapacity,
             analysts: employees.ANALYST,
             totalAnalystsCapacity: totalAnalystsCapacity,
             saboteurs: employees.SABOTEUR,
-            totalSaboteursCapacity: totalSaboteursCapacity,
-            totalOfficeSlotsUnlocked,
+            totalSaboteursCapacity: totalSaboteursCapacity
           }}
         />
 
@@ -131,7 +132,7 @@ export default async function DashboardPage({ searchParams }) {
         facilities={counts}
         employees={employees}
         capacities={capacities}
-        officeSlotsUnlocked={totalOfficeSlotsUnlocked}
+        safeFacilitiesSlotsUnlocked={hqFacilitiesAvailables * sanitizeNumber(hqLevelData?.capacity, 0, { min: 0 })}
         levels={{
           HQ: company.hqLevel || 1,
           OFFICE: company.officeLevel || 1, 

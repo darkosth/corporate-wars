@@ -1,19 +1,21 @@
-import { BUILDINGS, OFFICES_PER_HQ } from '../game/constants'
+import { BUILDINGS } from '../game/constants'
 import { sanitizeNumber } from '../utils/company'
 
-export default function Inventory({ employees, facilities }) {
-  const totalHqs = sanitizeNumber(facilities?.HQ, 0, { min: 0 })
-  const totalOffices = sanitizeNumber(facilities?.OFFICE, 0, { min: 0 })
-  const totalDatacenters = sanitizeNumber(facilities?.DATACENTER, 0, { min: 0 })
-  const totalBasements = sanitizeNumber(facilities?.BASEMENT, 0, { min: 0 })
+export default function Inventory({ availablesEmployees, availablesFacilities }) {
+  const totalHqs = sanitizeNumber(availablesFacilities?.HQ, 0, { min: 0 })
+  const totalFacilitiesSlotsUnlocked = totalHqs * sanitizeNumber(availablesFacilities?.HQCapacity, 0, { min: 0 })
+
+  const totalOffices = sanitizeNumber(availablesFacilities?.OFFICE, 0, { min: 0 })
+  const totalDatacenters = sanitizeNumber(availablesFacilities?.DATACENTER, 0, { min: 0 })
+  const totalBasements = sanitizeNumber(availablesFacilities?.BASEMENT, 0, { min: 0 })
+  const totalBuildings = totalOffices + totalDatacenters + totalBasements
   const safeEmployees = {
-    programmers: sanitizeNumber(employees?.programmers, 0, { min: 0 }),
-    totalProgrammersCapacity: sanitizeNumber(employees?.totalProgrammersCapacity, 0, { min: 0 }),
-    analysts: sanitizeNumber(employees?.analysts, 0, { min: 0 }),
-    totalAnalystsCapacity: sanitizeNumber(employees?.totalAnalystsCapacity, 0, { min: 0 }),
-    saboteurs: sanitizeNumber(employees?.saboteurs, 0, { min: 0 }),
-    totalSaboteursCapacity: sanitizeNumber(employees?.totalSaboteursCapacity, 0, { min: 0 }),
-    totalOfficeSlotsUnlocked: sanitizeNumber(employees?.totalOfficeSlotsUnlocked, 0, { min: 0 })
+    programmers: sanitizeNumber(availablesEmployees?.programmers, 0, { min: 0 }),
+    totalProgrammersCapacity: sanitizeNumber(availablesEmployees?.totalProgrammersCapacity, 0, { min: 0 }),
+    analysts: sanitizeNumber(availablesEmployees?.analysts, 0, { min: 0 }),
+    totalAnalystsCapacity: sanitizeNumber(availablesEmployees?.totalAnalystsCapacity, 0, { min: 0 }),
+    saboteurs: sanitizeNumber(availablesEmployees?.saboteurs, 0, { min: 0 }),
+    totalSaboteursCapacity: sanitizeNumber(availablesEmployees?.totalSaboteursCapacity, 0, { min: 0 })
   }
 
   return (
@@ -24,7 +26,7 @@ export default function Inventory({ employees, facilities }) {
           <div className="p-4 flex justify-between items-center">
             <div>
               <p className="text-white font-medium">{BUILDINGS.HQ.name}</p>
-              <p className="text-xs text-neutral-500">Cada HQ habilita {OFFICES_PER_HQ} offices</p>
+              <p className="text-xs text-neutral-500">Habilita <span className="text-neutral-300 font-semibold">{totalFacilitiesSlotsUnlocked}</span> edificios en total</p>
             </div>
             <span className="text-xl font-bold text-white">x{totalHqs}</span>
           </div>
@@ -32,7 +34,7 @@ export default function Inventory({ employees, facilities }) {
           <div className="p-4 flex justify-between items-center">
             <div>
               <p className="text-white font-medium">{BUILDINGS.OFFICE.name}</p>
-              <p className="text-xs text-neutral-500">{totalOffices} / {safeEmployees.totalOfficeSlotsUnlocked} habilitados por HQ</p>
+              <p className="text-xs text-neutral-500">{totalBuildings} / {totalFacilitiesSlotsUnlocked} habilitados por HQ</p>
             </div>
             <span className="text-xl font-bold text-white">x{totalOffices}</span>
           </div>
@@ -40,7 +42,7 @@ export default function Inventory({ employees, facilities }) {
           <div className="p-4 flex justify-between items-center">
             <div>
               <p className="text-white font-medium">{BUILDINGS.DATACENTER.name}</p>
-              <p className="text-xs text-neutral-500">Numero de edificios obtenidos</p>
+              <p className="text-xs text-neutral-500">{totalBuildings} / {totalFacilitiesSlotsUnlocked} habilitados por HQ</p>
             </div>
             <span className="text-xl font-bold text-white">x{totalDatacenters}</span>
           </div>
@@ -48,7 +50,7 @@ export default function Inventory({ employees, facilities }) {
           <div className="p-4 flex justify-between items-center">
             <div>
               <p className="text-white font-medium">{BUILDINGS.BASEMENT.name}</p>
-              <p className="text-xs text-neutral-500">Numero de edificios obtenidos</p>
+              <p className="text-xs text-neutral-500">{totalBuildings} / {totalFacilitiesSlotsUnlocked} habilitados por HQ</p>
             </div>
             <span className="text-xl font-bold text-white">x{totalBasements}</span>
           </div>

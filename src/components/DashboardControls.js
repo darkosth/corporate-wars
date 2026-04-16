@@ -60,7 +60,7 @@ const ActionCard = ({ title, subtitle, emoji, cost, revenue, expense, onAction, 
   </div>
 )
 
-export default function DashboardControls({ liquidCash, facilities, employees, capacities, officeSlotsUnlocked, levels }) {
+export default function DashboardControls({ liquidCash, facilities, employees, capacities, safeFacilitiesSlotsUnlocked, levels }) {
   const [error, setError] = useState(null)
   const [loadingStates, setLoadingStates] = useState({
     hq: false,
@@ -113,13 +113,14 @@ export default function DashboardControls({ liquidCash, facilities, employees, c
     DATACENTER: sanitizeNumber(capacities?.DATACENTER, 0, { min: 0 }),
     BASEMENT: sanitizeNumber(capacities?.BASEMENT, 0, { min: 0 })
   }
-  const safeOfficeSlotsUnlocked = sanitizeNumber(officeSlotsUnlocked, 0, { min: 0 })
 
   const canAffordHq = safeLiquidCash >= BUILDINGS.HQ.basePrice
   const canAffordOffice = safeLiquidCash >= BUILDINGS.OFFICE.basePrice
+  const hasOfficeSlotAvailable = safeFacilitiesSlotsUnlocked
   const canAffordDataCenter = safeLiquidCash >= BUILDINGS.DATACENTER.basePrice
+  const hasDataCenterSlotAvailable = safeFacilitiesSlotsUnlocked
   const canAffordBasement = safeLiquidCash >= BUILDINGS.BASEMENT.basePrice
-  const hasOfficeSlotAvailable = safeFacilities.OFFICE < safeOfficeSlotsUnlocked
+  const hasBasementSlotAvailable = safeFacilitiesSlotsUnlocked
 
   const canAffordProgrammer = safeLiquidCash >= EMPLOYEES.PROGRAMMER.costToHire
   const hasspaceForProgrammer = safeEmployees.PROGRAMMER < safeCapacities.OFFICE
@@ -148,7 +149,7 @@ export default function DashboardControls({ liquidCash, facilities, employees, c
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <ActionCard
             title={`${BUILDINGS.HQ.name} (Lv. ${safeLevels.HQ})`}
-            subtitle={`Desbloquea hasta 5 offices por HQ. Actualmente tienes ${safeFacilities.HQ} HQ.`}
+            subtitle={`Desbloquea  offices obteniendo HQs. Actualmente tienes ${safeFacilities.HQ} HQ.`}
             emoji={BUILDINGS.HQ.emoji}
             cost={BUILDINGS.HQ.basePrice}
             revenue={hqData.revenue}
@@ -161,7 +162,7 @@ export default function DashboardControls({ liquidCash, facilities, employees, c
 
           <ActionCard
             title={`${BUILDINGS.OFFICE.name} (Lv. ${safeLevels.OFFICE})`}
-            subtitle={`${safeFacilities.OFFICE} / ${safeOfficeSlotsUnlocked} offices ocupados. ${BUILDINGS.OFFICE.description}`}
+            subtitle={`${safeFacilities.OFFICE} / ${hasOfficeSlotAvailable} offices ocupados. ${BUILDINGS.OFFICE.description}`}
             emoji={BUILDINGS.OFFICE.emoji}
             cost={BUILDINGS.OFFICE.basePrice}
             revenue={officeData.revenue}
@@ -186,7 +187,9 @@ export default function DashboardControls({ liquidCash, facilities, employees, c
             onAction={() => executeAction(() => buyFacility('DATACENTER'), 'dataCenter')}
             isLoading={loadingStates.dataCenter}
             isDisabled={isAnyLoading || !canAffordDataCenter}
-            buttonText={!canAffordDataCenter ? 'Fondos Insuficientes' : 'Firmar Contrato'}
+            buttonText={!canAffordDataCenter ? 'Fondos Insuficientes' :
+              !hasDataCenterSlotAvailable ? 'Sin cupo (Compra otro HQ)' :
+              'Firmar Contrato'}
           />
 
           <ActionCard

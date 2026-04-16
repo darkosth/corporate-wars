@@ -17,9 +17,10 @@ function toFiniteNumber(value, fallback) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback
 }
 
+
 export function sanitizeNumber(value, fallback = 0, { min } = {}) {
   let sanitized = toFiniteNumber(value, fallback)
-
+  
   if (typeof min === 'number') {
     sanitized = Math.max(min, sanitized)
   }
@@ -40,14 +41,21 @@ export function sanitizeDate(value, fallback = new Date()) {
   return parsed && !Number.isNaN(parsed.getTime()) ? parsed : fallback
 }
 
+export function sanitizeString(value, fallback = '') {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : fallback
+}
+
 export function sanitizeCompany(company) {
   if (!company) return null
-
+  
   const createdAt = sanitizeDate(company.createdAt)
   const now = new Date()
-
+  
   return {
-    ...company,
+    id: company.id,
+    ownerId: company.ownerId,
+    companyName: sanitizeString(company.companyName, 'My Company'),
+    ceoName: sanitizeString(company.ceoName, 'CEO'),
     liquidCash: sanitizeNumber(company.liquidCash, COMPANY_NUMERIC_DEFAULTS.liquidCash, { min: 0 }),
     programmers: sanitizeInteger(company.programmers, COMPANY_NUMERIC_DEFAULTS.programmers, { min: 0 }),
     analysts: sanitizeInteger(company.analysts, COMPANY_NUMERIC_DEFAULTS.analysts, { min: 0 }),
