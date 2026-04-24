@@ -3,6 +3,7 @@ import { updateSettings } from '../app/dashboard/actions'
 import { useRouter } from 'next/navigation'
 
 export default function SettingsModal({ currentCompany, currentCeo, isOpen }) {
+  
   const router = useRouter()
 
   if (!isOpen) return null

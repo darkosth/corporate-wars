@@ -1,9 +1,8 @@
 'use client'
-
 import { useState } from 'react'
-import { buyFacility, hireStaff } from '../app/dashboard/actions'
-import { BUILDINGS, EMPLOYEES } from '../game/constants'
-import { sanitizeNumber } from '../utils/company'
+import { buyFacility, hireStaff, upgradeFacility, sellFacility, fireStaff } from '../app/dashboard/actions'
+import ActionCard from './ui/ActionCard'
+import StaffActionCard from './ui/StaffActionCard'
 
 const Spinner = () => (
   <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
@@ -12,257 +11,274 @@ const Spinner = () => (
   </svg>
 )
 
-const formatAmount = (value, options = {}) => sanitizeNumber(value, 0, options).toLocaleString('en-US')
-
-const ActionCard = ({ title, subtitle, emoji, cost, revenue, expense, onAction, isLoading, isDisabled, buttonText }) => (
-  <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5 flex flex-col justify-between transition-all hover:border-neutral-600 hover:shadow-lg hover:shadow-black/50 group">
-    <div className="flex gap-4 mb-6">
-      <div className="w-16 h-16 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-center text-3xl shadow-inner flex-shrink-0 group-hover:scale-105 transition-transform">
-        {emoji}
-      </div>
-      <div>
-        <h3 className="text-white font-bold text-lg leading-tight">{title}</h3>
-        <p className="text-xs text-neutral-400 mt-1 leading-relaxed">{subtitle}</p>
-      </div>
-    </div>
-
-    <div className="space-y-2 mb-6 bg-neutral-950/50 p-3 rounded-lg border border-neutral-800/50">
-      <div className="flex justify-between items-center">
-        <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Costo Inicial</span>
-        <span className="text-sm font-mono text-white">${formatAmount(cost, { min: 0 })}</span>
-      </div>
-      <div className="flex justify-between items-center">
-        <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Ganancias Generadas </span>
-        <span className="text-sm font-mono text-white">${formatAmount(revenue, { min: 0 })}</span>
-      </div>
-      <div className="flex justify-between items-center">
-        <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Costo de Operación</span>
-        <span className="text-sm font-mono text-white">${formatAmount(expense, { min: 0 })}</span>
-      </div>
-      {(sanitizeNumber(revenue, 0) > 0 || sanitizeNumber(expense, 0) > 0) && (
-        <div className="flex justify-between items-center border-t border-neutral-800/50 pt-2 mt-2">
-          <span className="text-[10px] font-bold tracking-widest text-neutral-500 uppercase">Flujo Neto</span>
-          <span className={`text-sm font-mono ${sanitizeNumber(revenue, 0) - sanitizeNumber(expense, 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {sanitizeNumber(revenue, 0) - sanitizeNumber(expense, 0) >= 0 ? '+' : ''}${formatAmount(sanitizeNumber(revenue, 0) - sanitizeNumber(expense, 0))}/h
-          </span>
-        </div>
-      )}
-    </div>
-
-    <button
-      onClick={onAction}
-      disabled={isDisabled || isLoading}
-      className="relative w-full bg-neutral-800 border border-neutral-700 hover:border-neutral-500 hover:bg-neutral-700 text-white font-bold py-3 rounded-lg transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-    >
-      <span className={isLoading ? 'opacity-0' : 'opacity-100'}>{buttonText}</span>
-      {isLoading && <div className="absolute inset-0 flex items-center justify-center"><Spinner /></div>}
-    </button>
-  </div>
-)
-
-export default function DashboardControls({ liquidCash, facilities, employees, capacities, safeFacilitiesSlotsUnlocked, levels }) {
+export default function DashboardControls({ currentTab, player, infrastructure, staff }) {
   const [error, setError] = useState(null)
-  const [loadingStates, setLoadingStates] = useState({
-    hq: false,
-    office: false,
-    dataCenter: false,
-    basement: false,
-    programmer: false,
-    analyst: false,
-    saboteur: false
-  })
+  const [loadingState, setLoadingState] = useState(false)
 
-  const executeAction = async (actionFn, actionKey) => {
-    setLoadingStates(prev => ({ ...prev, [actionKey]: true }))
-    const result = await actionFn()
-
+  const executeAction = async (actionPromise) => {
+    setLoadingState(true)
+    const result = await actionPromise
     if (result?.error) setError(result.error)
     else setError(null)
-
-    setLoadingStates(prev => ({ ...prev, [actionKey]: false }))
+    setLoadingState(false)
   }
 
-  const isAnyLoading = Object.values(loadingStates).some(state => state)
+  // 1. EL "ENRUTADOR" INTERNO
+  let title = "";
+  let desc = "";
+  let buildingData = null;
+  let staffData = null;
 
-  const safeLevels = {
-    HQ: sanitizeNumber(levels?.HQ, 1, { min: 1 }),
-    OFFICE: sanitizeNumber(levels?.OFFICE, 1, { min: 1 }),
-    DATACENTER: sanitizeNumber(levels?.DATACENTER, 1, { min: 1 }),
-    BASEMENT: sanitizeNumber(levels?.BASEMENT, 1, { min: 1 })
+  switch(currentTab) {
+    case 'hq':
+      title = "Headquarters"; 
+      desc = "Gestión de terrenos, zonificación y construcción de infraestructura.";
+      buildingData = infrastructure.HQ;
+      break;
+    case 'office':
+      title = "Operaciones"; 
+      desc = "Centro de desarrollo de software de alta frecuencia.";
+      buildingData = infrastructure.OFFICE; 
+      staffData = staff.PROGRAMMER;
+      break;
+    case 'datacenter':
+      title = "Centro de Investigación"; 
+      desc = "Procesamiento de datos y analítica avanzada.";
+      buildingData = infrastructure.DATACENTER; 
+      staffData = staff.ANALYST;
+      break;
+    case 'basement':
+      title = "Operaciones Encubiertas"; 
+      desc = "Instalaciones no registradas. Máxima seguridad.";
+      buildingData = infrastructure.BASEMENT; 
+      staffData = staff.SABOTEUR;
+      break;
   }
 
-  const hqData = BUILDINGS.HQ.levels[safeLevels.HQ] || BUILDINGS.HQ.levels[1]
-  const officeData = BUILDINGS.OFFICE.levels[safeLevels.OFFICE] || BUILDINGS.OFFICE.levels[1]
-  const dataCenterData = BUILDINGS.DATACENTER.levels[safeLevels.DATACENTER] || BUILDINGS.DATACENTER.levels[1]
-  const basementData = BUILDINGS.BASEMENT.levels[safeLevels.BASEMENT] || BUILDINGS.BASEMENT.levels[1]
+  const checkAfford = (price) => player.liquidCash >= price
+  const slots = infrastructure.slots;
+  const buildingTypes = ['HQ', 'OFFICE', 'DATACENTER', 'BASEMENT'];
 
-  const safeLiquidCash = sanitizeNumber(liquidCash, 0, { min: 0 })
-  const safeFacilities = {
-    HQ: sanitizeNumber(facilities?.HQ, 0, { min: 0 }),
-    OFFICE: sanitizeNumber(facilities?.OFFICE, 0, { min: 0 }),
-    DATACENTER: sanitizeNumber(facilities?.DATACENTER, 0, { min: 0 }),
-    BASEMENT: sanitizeNumber(facilities?.BASEMENT, 0, { min: 0 })
-  }
-  const safeEmployees = {
-    PROGRAMMER: sanitizeNumber(employees?.PROGRAMMER, 0, { min: 0 }),
-    ANALYST: sanitizeNumber(employees?.ANALYST, 0, { min: 0 }),
-    SABOTEUR: sanitizeNumber(employees?.SABOTEUR, 0, { min: 0 })
-  }
-  const safeCapacities = {
-    OFFICE: sanitizeNumber(capacities?.OFFICE, 0, { min: 0 }),
-    DATACENTER: sanitizeNumber(capacities?.DATACENTER, 0, { min: 0 }),
-    BASEMENT: sanitizeNumber(capacities?.BASEMENT, 0, { min: 0 })
-  }
+  const formatMoney = (val) => (val || 0).toLocaleString('en-US');
 
-  const canAffordHq = safeLiquidCash >= BUILDINGS.HQ.basePrice
-  const canAffordOffice = safeLiquidCash >= BUILDINGS.OFFICE.basePrice
-  const hasOfficeSlotAvailable = safeFacilitiesSlotsUnlocked
-  const canAffordDataCenter = safeLiquidCash >= BUILDINGS.DATACENTER.basePrice
-  const hasDataCenterSlotAvailable = safeFacilitiesSlotsUnlocked
-  const canAffordBasement = safeLiquidCash >= BUILDINGS.BASEMENT.basePrice
-  const hasBasementSlotAvailable = safeFacilitiesSlotsUnlocked
+  const isHQ = buildingData?.type === 'HQ';
+  const capacityLabel = isHQ ? 'Capacidad de Parcelas' : 'Ocupación de Personal';
+  const capacityValue = isHQ 
+    ? `${buildingData[`${buildingData.type}_SNAP`].totalCapacity} edificios` 
+    : `${staffData?.count || 0} / ${buildingData[`${buildingData.type}_SNAP`].totalCapacity} empleados`;
 
-  const canAffordProgrammer = safeLiquidCash >= EMPLOYEES.PROGRAMMER.costToHire
-  const hasspaceForProgrammer = safeEmployees.PROGRAMMER < safeCapacities.OFFICE
-
-  const canAffordAnalyst = safeLiquidCash >= EMPLOYEES.ANALYST.costToHire
-  const hasSpaceForAnalyst = safeEmployees.ANALYST < safeCapacities.DATACENTER
-
-  const canAffordSaboteur = safeLiquidCash >= EMPLOYEES.SABOTEUR.costToHire
-  const hasSpaceForSaboteur = safeEmployees.SABOTEUR < safeCapacities.BASEMENT
+  // Cálculos Financieros Estrictos del Departamento
+  const deptGross = (buildingData ? buildingData[`${buildingData.type}_SNAP`].totalRevenue : 0) + 
+                    (staffData ? staffData[`${staffData.role}_SNAP`].totalRevenue : 0);
+                    
+  const deptExpenses = (buildingData ? buildingData[`${buildingData.type}_SNAP`].totalMaintenance : 0) + 
+                       (staffData ? staffData[`${staffData.role}_SNAP`].totalSalary : 0);
+                       
+  const deptNet = deptGross - deptExpenses;
+  const isNetPositive = deptNet >= 0;
 
   return (
-    <div className="pt-8">
-      {error && (
-        <div className="transition-all duration-300 overflow-hidden mb-6">
-          <div className="p-4 bg-red-950/50 border border-red-800 text-red-400 rounded-lg flex items-center gap-3">
-            <span className="text-xl">⚠️</span>
-            <p className="text-sm font-medium">{error}</p>
+    <div className="animate-in fade-in duration-500 max-w-5xl mx-auto pb-20">
+      
+      {/* CABECERA GLOBAL */}
+      <header className="mb-8 flex flex-col md:flex-row justify-between md:items-end gap-4 border-b border-neutral-800 pb-4">
+        <div>
+          <div className="flex items-center gap-4">
+            <h2 className="text-3xl font-light text-white">{title}</h2>
+            {buildingData && (
+              <span className="bg-neutral-800 border border-neutral-700 text-neutral-300 px-3 py-1 rounded-full text-xs font-bold tracking-widest uppercase shadow-inner">
+                Nivel {buildingData.level}
+              </span>
+            )}
           </div>
+          <p className="text-neutral-500 mt-1">{desc}</p>
+        </div>
+        
+        <div className="text-xs font-mono bg-neutral-900 border border-neutral-800 px-4 py-2 rounded-lg text-neutral-400 shadow-inner shrink-0">
+          Parcelas usadas: <span className={slots.isFull ? "text-red-400 font-bold" : "text-white"}>{slots.occupied} / {slots.total}</span>
+        </div>
+      </header>
+
+      {error && (
+        <div className="mb-6 p-4 bg-red-950/50 border border-red-800 text-red-400 rounded-lg flex items-center gap-3">
+          <span className="text-xl">⚠️</span>
+          <p className="text-sm font-medium">{error}</p>
         </div>
       )}
 
-      <div className="mb-10">
-        <h2 className="text-sm font-bold text-neutral-500 uppercase tracking-widest mb-4 border-b border-neutral-800 pb-2 flex items-center gap-2">
-          <span>🏗️</span> Infraestructura Corporativa
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          <ActionCard
-            title={`${BUILDINGS.HQ.name} (Lv. ${safeLevels.HQ})`}
-            subtitle={`Desbloquea  offices obteniendo HQs. Actualmente tienes ${safeFacilities.HQ} HQ.`}
-            emoji={BUILDINGS.HQ.emoji}
-            cost={BUILDINGS.HQ.basePrice}
-            revenue={hqData.revenue}
-            expense={hqData.maintenance}
-            onAction={() => executeAction(() => buyFacility('HQ'), 'hq')}
-            isLoading={loadingStates.hq}
-            isDisabled={isAnyLoading || !canAffordHq}
-            buttonText={!canAffordHq ? 'Fondos Insuficientes' : 'Comprar HQ'}
-          />
+      <div className="space-y-10">
+        
+        {/* SECCIÓN 1: HERO STATS & UPGRADE */}
+        {buildingData && (
+          <div className="relative bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl overflow-hidden group">
+            <div className="absolute top-0 right-0 p-8 opacity-5 text-9xl pointer-events-none transform translate-x-1/4 -translate-y-1/4">
+              {buildingData[`${buildingData.type}_CONF`].emoji}
+            </div>
 
-          <ActionCard
-            title={`${BUILDINGS.OFFICE.name} (Lv. ${safeLevels.OFFICE})`}
-            subtitle={`${safeFacilities.OFFICE} / ${hasOfficeSlotAvailable} offices ocupados. ${BUILDINGS.OFFICE.description}`}
-            emoji={BUILDINGS.OFFICE.emoji}
-            cost={BUILDINGS.OFFICE.basePrice}
-            revenue={officeData.revenue}
-            expense={officeData.maintenance}
-            onAction={() => executeAction(() => buyFacility('OFFICE'), 'office')}
-            isLoading={loadingStates.office}
-            isDisabled={isAnyLoading || !canAffordOffice || !hasOfficeSlotAvailable}
-            buttonText={
-              !canAffordOffice ? 'Fondos Insuficientes' :
-              !hasOfficeSlotAvailable ? 'Sin cupo (Compra otro HQ)' :
-              'Firmar Contrato'
-            }
-          />
+            <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-8">
+              
+              {/* Bloque Izquierdo: Flujo Neto (El Rey) */}
+              <div className="flex-1 w-full">
+                {/* Generación Bruta relegada a subtítulo */}
+                <h3 className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-1">
+                  Generación Bruta: ${formatMoney(deptGross)}/h
+                </h3>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-5xl font-black font-mono drop-shadow-[0_0_15px_rgba(52,211,153,0.3)] ${isNetPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {isNetPositive ? '+' : '-'}${formatMoney(Math.abs(deptNet))}
+                  </span>
+                  <span className={`text-xl font-bold ${isNetPositive ? 'text-emerald-600' : 'text-red-600'}`}>/h</span>
+                </div>
+                <p className="text-xs text-neutral-500 mt-2">
+                  Flujo neto basado en {buildingData.count} instalación(es) operativas.
+                </p>
+              </div>
 
-          <ActionCard
-            title={`${BUILDINGS.DATACENTER.name} (Lv. ${safeLevels.DATACENTER})`}
-            subtitle={BUILDINGS.DATACENTER.description}
-            emoji={BUILDINGS.DATACENTER.emoji}
-            cost={BUILDINGS.DATACENTER.basePrice}
-            revenue={dataCenterData.revenue}
-            expense={dataCenterData.maintenance}
-            onAction={() => executeAction(() => buyFacility('DATACENTER'), 'dataCenter')}
-            isLoading={loadingStates.dataCenter}
-            isDisabled={isAnyLoading || !canAffordDataCenter}
-            buttonText={!canAffordDataCenter ? 'Fondos Insuficientes' :
-              !hasDataCenterSlotAvailable ? 'Sin cupo (Compra otro HQ)' :
-              'Firmar Contrato'}
-          />
+              {/* Bloque Central: Desglose Detallado */}
+              <div className="flex flex-col lg:flex-row gap-6 w-full lg:w-auto border-y lg:border-y-0 lg:border-x border-neutral-800 py-4 lg:py-0 lg:px-6">
+                
+                <div className="space-y-2 min-w-[140px]">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest border-b border-neutral-800 pb-1 block">Desglose Operativo</span>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-500">Instalación:</span>
+                    <span className="font-mono text-red-400/80">-${formatMoney(buildingData[`${buildingData.type}_SNAP`].totalMaintenance)}/h</span>
+                  </div>
+                  {staffData && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-neutral-500">Nómina:</span>
+                      <span className="font-mono text-red-400/80">-${formatMoney(staffData[`${staffData.role}_SNAP`].totalSalary)}/h</span>
+                    </div>
+                  )}
+                </div>
 
-          <ActionCard
-            title={`${BUILDINGS.BASEMENT.name} (Lv. ${safeLevels.BASEMENT})`}
-            subtitle={BUILDINGS.BASEMENT.description}
-            emoji={BUILDINGS.BASEMENT.emoji}
-            cost={BUILDINGS.BASEMENT.basePrice}
-            revenue={basementData.revenue}
-            expense={basementData.maintenance}
-            onAction={() => executeAction(() => buyFacility('BASEMENT'), 'basement')}
-            isLoading={loadingStates.basement}
-            isDisabled={isAnyLoading || !canAffordBasement}
-            buttonText={!canAffordBasement ? 'Fondos Insuficientes' : 'Firmar Contrato'}
-          />
+                <div className="space-y-2 min-w-[140px]">
+                  <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest border-b border-neutral-800 pb-1 block">Estado General</span>
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-500">{capacityLabel}:  </span>
+                    <span className="font-mono text-blue-400">{capacityValue}</span>
+                  </div>
+                  {staffData && (
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-neutral-500">Prod. Personal:</span>
+                      <span className="font-mono text-emerald-400/80">+${formatMoney(staffData[`${staffData.role}_SNAP`].totalRevenue)}/h</span>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Bloque Derecho: Upgrade */}
+              <div className="w-full lg:w-auto flex flex-col items-center lg:items-end">
+                {buildingData[`${buildingData.type}_CONF`].isMaxLevel ? (
+                  <>
+                    <button 
+                      disabled={true} 
+                      className="w-full lg:w-auto bg-neutral-800 border border-neutral-700 text-neutral-500 px-8 py-4 rounded-xl font-black text-sm tracking-widest uppercase cursor-not-allowed"
+                    >
+                      👑 Nivel Máximo
+                    </button>
+                    <span className="text-[10px] font-mono text-emerald-500 mt-2 block">
+                      Tecnología tope alcanzada
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <button 
+                      onClick={() => executeAction(upgradeFacility(buildingData.type))}
+                      disabled={loadingState || !checkAfford(buildingData[`${buildingData.type}_CONF`].nextUpgradeCost)} 
+                      className="relative w-full lg:w-auto bg-gradient-to-t from-blue-700 to-blue-500 hover:from-blue-600 hover:to-blue-400 border border-blue-400 text-white px-8 py-4 rounded-xl font-black text-sm tracking-widest uppercase shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all active:scale-95 disabled:opacity-50 disabled:grayscale"
+                    >
+                      <span className={loadingState ? 'opacity-0' : 'opacity-100'}>
+                        🚀 Subir a Nivel {buildingData.level + 1}
+                      </span>
+                      {loadingState && <div className="absolute inset-0 flex items-center justify-center"><Spinner /></div>}
+                    </button>
+                    <span className="text-[10px] font-mono text-neutral-400 mt-2 block">
+                      Costo de mejora: <strong className={checkAfford(buildingData[`${buildingData.type}_CONF`].nextUpgradeCost) ? "text-white" : "text-red-400"}>
+                        ${formatMoney(buildingData[`${buildingData.type}_CONF`].nextUpgradeCost)}
+                      </strong>
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECCIÓN 2: CONTENIDO DINÁMICO (HQ vs RRHH) */}
+        {isHQ ? (
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest flex items-center gap-2 border-b border-neutral-800 pb-2">
+              <span>🏗️</span> Planificación Urbana Corporativa
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {buildingTypes.map((type) => {
+                const bData = infrastructure[type];
+                const typeIsHQ = type === 'HQ';
+                const canAfford = checkAfford(bData[`${type}_CONF`].basePrice);
+                const isBlocked = !typeIsHQ && slots.isFull;
+
+                return (
+                  <ActionCard
+                    key={type}
+                    title={`${bData[`${type}_CONF`].name}`}
+                    subtitle={bData[`${type}_CONF`].description}
+                    emoji={bData[`${type}_CONF`].emoji}
+                    cost={bData[`${type}_CONF`].basePrice}
+                    revenue={bData[`${type}_CONF`].baseRevenue}
+                    expense={bData[`${type}_CONF`].baseMaintenance}
+                    onAction={() => executeAction(buyFacility(type))}
+                    onSell={() => executeAction(sellFacility(type))}
+                    canSell={bData.count > (type ==='HQ' ? 1 : 0)} // Solo se puede vender si hay al menos 1 (o 2 para HQ)
+                    sellPrice={Math.floor(bData[`${type}_CONF`].basePrice / 2)}
+                    isLoading={loadingState}
+                    isDisabled={loadingState || !canAfford || isBlocked}
+                    buttonText={
+                      !canAfford ? 'Fondos Insuficientes' :
+                      isBlocked ? 'Sin cupo (Expande el HQ)' :
+                      typeIsHQ ? 'Expandir Sede' : 'Construir Instalación'
+                    }
+                  />
+                )
+              })}
+            </div>
+          </div>
+        ) : staffData ? (
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest flex items-center gap-2 border-b border-neutral-800 pb-2">
+              <span>👥</span> Recursos Humanos
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <StaffActionCard
+                title={staffData[`${staffData.role}_CONF`].name}
+                subtitle={staffData[`${staffData.role}_CONF`].description}
+                emoji={staffData[`${staffData.role}_CONF`].emoji}
+                cost={staffData[`${staffData.role}_CONF`].costToHire}
+                revenue={staffData[`${staffData.role}_CONF`].revenue}
+                expense={staffData[`${staffData.role}_CONF`].salary}
+                onAction={(qty) => executeAction(hireStaff(staffData.role, qty))}
+                onSell={(qty) => executeAction(fireStaff(staffData.role, qty))}
+                staffCount={staffData.count} // Para validar que no despidas fantasmas
+                isLoading={loadingState}
+                maxSpace={staffData[`${staffData.role}_SNAP`].capacityLimit - staffData.count}
+                playerCash={player.liquidCash}
+              />
+            </div>
+          </div>
+        ) : null}
+
+        {/* SECCIÓN 3: MÓDULOS Y ACCESORIOS */}
+        <div className="space-y-4 pt-4">
+          <h3 className="text-sm font-bold text-neutral-500 uppercase tracking-widest flex items-center gap-2 border-b border-neutral-800 pb-2">
+            <span>🔌</span> Módulos y Equipamiento Adicional
+          </h3>
+          <div className="h-32 border border-dashed border-neutral-700/50 rounded-xl flex flex-col items-center justify-center bg-neutral-900/30 group cursor-not-allowed">
+            <span className="text-2xl mb-2 opacity-50 group-hover:opacity-100 transition-opacity">🛒</span>
+            <p className="text-neutral-500 text-xs font-mono uppercase tracking-widest">Mercado de accesorios bloqueado</p>
+            <p className="text-neutral-700 text-[10px] mt-1">Próximamente disponibles.</p>
+          </div>
         </div>
-      </div>
 
-      <div>
-        <h2 className="text-sm font-bold text-neutral-500 uppercase tracking-widest mb-4 border-b border-neutral-800 pb-2 flex items-center gap-2">
-          <span>👥</span> Capital Humano
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <ActionCard
-            title={EMPLOYEES.PROGRAMMER.name}
-            subtitle={EMPLOYEES.PROGRAMMER.description}
-            emoji={EMPLOYEES.PROGRAMMER.emoji}
-            cost={EMPLOYEES.PROGRAMMER.costToHire}
-            revenue={EMPLOYEES.PROGRAMMER.revenuePerHour}
-            expense={EMPLOYEES.PROGRAMMER.salaryPerHour}
-            onAction={() => executeAction(() => hireStaff('PROGRAMMER'), 'programmer')}
-            isLoading={loadingStates.programmer}
-            isDisabled={isAnyLoading || !canAffordProgrammer || !hasspaceForProgrammer}
-            buttonText={
-              !canAffordProgrammer ? 'Fondos Insuficientes' :
-              !hasspaceForProgrammer ? 'Sin Espacio (Alquila más oficinas)' :
-              'Reclutar'
-            }
-          />
-
-          <ActionCard
-            title={EMPLOYEES.ANALYST.name}
-            subtitle={EMPLOYEES.ANALYST.description}
-            emoji={EMPLOYEES.ANALYST.emoji}
-            cost={EMPLOYEES.ANALYST.costToHire}
-            revenue={EMPLOYEES.ANALYST.revenuePerHour}
-            expense={EMPLOYEES.ANALYST.salaryPerHour}
-            onAction={() => executeAction(() => hireStaff('ANALYST'), 'analyst')}
-            isLoading={loadingStates.analyst}
-            isDisabled={isAnyLoading || !canAffordAnalyst || !hasSpaceForAnalyst}
-            buttonText={
-              !canAffordAnalyst ? 'Fondos Insuficientes' :
-              !hasSpaceForAnalyst ? 'Sin Espacio (Alquila más centros de datos)' :
-              'Reclutar'
-            }
-          />
-
-          <ActionCard
-            title={EMPLOYEES.SABOTEUR.name}
-            subtitle={EMPLOYEES.SABOTEUR.description}
-            emoji={EMPLOYEES.SABOTEUR.emoji}
-            cost={EMPLOYEES.SABOTEUR.costToHire}
-            revenue={EMPLOYEES.SABOTEUR.revenuePerHour}
-            expense={EMPLOYEES.SABOTEUR.salaryPerHour}
-            onAction={() => executeAction(() => hireStaff('SABOTEUR'), 'saboteur')}
-            isLoading={loadingStates.saboteur}
-            isDisabled={isAnyLoading || !canAffordSaboteur || !hasSpaceForSaboteur}
-            buttonText={
-              !canAffordSaboteur ? 'Fondos Insuficientes' :
-              !hasSpaceForSaboteur ? 'Sin Espacio (Alquila más oficinas)' :
-              'Reclutar'
-            }
-          />
-        </div>
       </div>
     </div>
   )

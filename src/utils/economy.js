@@ -1,4 +1,3 @@
-// src/utils/economy.js
 import prisma from './prisma'
 import { BUILDINGS, EMPLOYEES } from '../game/constants'
 import { sanitizeCompany, sanitizeNumber } from './company'

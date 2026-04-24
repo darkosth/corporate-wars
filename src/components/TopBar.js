@@ -1,35 +1,30 @@
 'use client'
-
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
-import { sanitizeNumber } from '../utils/company'
 
-const formatMoney = (value) => Math.floor(sanitizeNumber(value, 0)).toLocaleString('en-US')
+// el Engine manda los números limpios sin formato, así que aquí los formateamos para mostrar
+const formatMoney = (value) => Math.floor(value || 0).toLocaleString('en-US')
 
 export default function TopBar({ companyName, ceoName, initialLiquidCash, stats }) {
-  const safeInitialCash = sanitizeNumber(initialLiquidCash, 0, { min: 0 })
-  const safeStats = {
-    revenuePerHour: sanitizeNumber(stats?.revenuePerHour, 0),
-    expensesPerHour: sanitizeNumber(stats?.expensesPerHour, 0),
-    netFlowPerHour: sanitizeNumber(stats?.netFlowPerHour, 0)
-  }
-  const [currentCash, setCurrentCash] = useState(safeInitialCash)
+  const [currentCash, setCurrentCash] = useState(initialLiquidCash)
 
+  // Sincroniza el dinero inicial cuando carga o actualiza la base de datos
   useEffect(() => {
-    setCurrentCash(safeInitialCash)
-  }, [safeInitialCash])
+    setCurrentCash(initialLiquidCash)
+  }, [initialLiquidCash])
 
+  // El famoso "Motor de Tiempo" visual (Ticker)
   useEffect(() => {
-    const cashPerSecond = safeStats.netFlowPerHour / 3600
+    const cashPerSecond = (stats?.netFlowPerHour || 0) / 3600
     const timer = setInterval(() => {
       setCurrentCash((cash) => cash + cashPerSecond)
     }, 1000)
 
     return () => clearInterval(timer)
-  }, [safeStats.netFlowPerHour])
+  }, [stats?.netFlowPerHour])
 
   // Determinamos si estamos en ganancias o pérdidas para el estilo visual
-  const isPositive = safeStats.netFlowPerHour >= 0
+  const isPositive = (stats?.netFlowPerHour || 0) >= 0
 
   return (
     <nav className="sticky top-0 z-50 w-full bg-neutral-950 border-b border-neutral-800 shadow-md">
@@ -51,7 +46,7 @@ export default function TopBar({ companyName, ceoName, initialLiquidCash, stats 
                 Gross Generation
               </span>
               <span className={`text-sm font-bold font-mono ${isPositive ? 'text-blue-500' : 'text-red-500'}`}>
-                {isPositive ? '+' : ''}${formatMoney(safeStats.revenuePerHour)}/h
+                {isPositive ? '+' : ''}${formatMoney(stats?.revenuePerHour)}/h
               </span>
             </div>
 
@@ -61,7 +56,7 @@ export default function TopBar({ companyName, ceoName, initialLiquidCash, stats 
                 Operating Expenses
               </span>
               <span className={`text-sm font-bold font-mono ${!isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-                {isPositive ? '-' : ''}${formatMoney(safeStats.expensesPerHour)}/h
+                {isPositive ? '-' : ''}${formatMoney(stats?.expensesPerHour)}/h
               </span>
             </div>
 
@@ -71,7 +66,7 @@ export default function TopBar({ companyName, ceoName, initialLiquidCash, stats 
                 Net Flow
               </span>
               <span className={`text-sm font-bold font-mono ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-                {isPositive ? '+' : ''}${formatMoney(safeStats.netFlowPerHour)}/h
+                {isPositive ? '+' : ''}${formatMoney(stats?.netFlowPerHour)}/h
               </span>
             </div>
 

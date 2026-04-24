@@ -1,34 +1,27 @@
 import { createClient } from '../../utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { BUILDINGS } from '../../game/constants'
 import prisma from '../../utils/prisma'
 import TopBar from '../../components/TopBar'
+import Sidebar from '../../components/Sidebar' // <-- NUEVO
 import Inventory from '../../components/Inventory'
 import DashboardControls from '../../components/DashboardControls'
 import SettingsModal from '@/components/SettingsModal'
-import { syncCompanyEconomy, calculateCompanyStats } from '../../utils/economy'
-import { sanitizeCompany, sanitizeNumber } from '../../utils/company'
-
-function getLevelData(type, level) {
-  return BUILDINGS[type]?.levels?.[level] || BUILDINGS[type]?.levels?.[1]
-}
+import { syncCompanyEconomy, calculateGameState } from '../../utils/gameEngine' 
 
 export default async function DashboardPage({ searchParams }) {
   const params = await searchParams;
   const ShowSettings = params.settings === 'true'
+  
+  // NUEVO: Leemos en qué pestaña estamos (por defecto 'overview')
+  const currentTab = params.tab || 'overview' 
+
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
 
-  if (error || !user) {
-    redirect('/login')
-  }
+  if (error || !user) redirect('/login')
 
-  // 1. Intentamos obtener la compañía inicialmente
-  let company = await prisma.company.findUnique({
-    where: { ownerId: user.id }
-  })
+  let company = await prisma.company.findUnique({ where: { ownerId: user.id } })
 
-  // 2. Lógica de creación o sincronización
   if (!company) {
     company = await prisma.company.create({
       data: {
@@ -36,118 +29,58 @@ export default async function DashboardPage({ searchParams }) {
         companyName: `Corp-${user.id.substring(0, 6).toUpperCase()}`,
         ceoName: "CEO Principal",
         liquidCash: 100000.0,
+        hqCount: 1,
+        hqLevel: 1,
       }
     })
   } else {
-    // Sincronizamos la economía (intereses, ingresos pasivos, etc.)
-    await syncCompanyEconomy(user.id)
-    
-    // Refrescamos los datos después de la sincronización para tener valores actuales
-    company = await prisma.company.findUnique({
-      where: { id: company.id }
-    })
+    company = await syncCompanyEconomy(user.id) 
   }
-  // Si por alguna razón falla el fetch, evitamos el crash
+
   if (!company) return <div>Error loading company data.</div>
 
-  company = sanitizeCompany(company)
-
-  // 3. Cálculos derivados
-  const stats = calculateCompanyStats(company)
-  const hqLevelData = getLevelData('HQ', company.hqLevel)
-  const officeLevelData = getLevelData('OFFICE', company.officeLevel)
-  const datacenterLevelData = getLevelData('DATACENTER', company.datacenterLevel)
-  const basementLevelData = getLevelData('BASEMENT', company.basementLevel)
-
-  // Calculamos la cantidad total de slots de edificios desbloqueados por los HQs
-  const hqFacilitiesAvailables = sanitizeNumber(company.hqCount, 0, { min: 0 });
-
-  // Calculamos la capacidad total de programadores basada en las oficinas alquiladas
-  const officeFacilities = sanitizeNumber(company.officeCount, 0, { min: 0 });
-  const totalProgrammersCapacity = officeFacilities * sanitizeNumber(officeLevelData?.capacity, 0, { min: 0 });
-
-  //claculamos la capacidad total de analistas basada en los Datacenters alquilados
-  const datacenterFacilities = sanitizeNumber(company.datacenterCount, 0, { min: 0 });
-  const totalAnalystsCapacity = datacenterFacilities * sanitizeNumber(datacenterLevelData?.capacity, 0, { min: 0 });
-
-  // Calculamos la capacidad total de saboteadores basada en los Basements alquilados
-  const basementFacilities = sanitizeNumber(company.basementCount, 0, { min: 0 });
-  const totalSaboteursCapacity = basementFacilities * sanitizeNumber(basementLevelData?.capacity, 0, { min: 0 });
-
-  const counts = {
-    HQ: company.hqCount,
-    OFFICE: company.officeCount,
-    DATACENTER: company.datacenterCount,
-    BASEMENT: company.basementCount,
-  }
-
-  const capacities = {
-    HQ: counts.HQ * sanitizeNumber(hqLevelData?.capacity, 0, { min: 0 }),
-    OFFICE: counts.OFFICE * sanitizeNumber(officeLevelData?.capacity, 0, { min: 0 }),
-    DATACENTER: counts.DATACENTER * sanitizeNumber(datacenterLevelData?.capacity, 0, { min: 0 }),
-    BASEMENT: counts.BASEMENT * sanitizeNumber(basementLevelData?.capacity, 0, { min: 0 }),
-  }
-
-  const employees = {
-    PROGRAMMER: company.programmers,
-    ANALYST: company.analysts,
-    SABOTEUR: company.saboteurs
-  }
+  const gameState = calculateGameState(company)
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-300 font-sans">
+    <div className="min-h-screen bg-neutral-950 text-neutral-300 font-sans flex flex-col overflow-hidden">
       <TopBar 
-        companyName={company.companyName} 
-        ceoName={company.ceoName}
-        initialLiquidCash={company.liquidCash}
-        stats={stats}
+        companyName={gameState.player.companyName} 
+        ceoName={gameState.player.name}
+        initialLiquidCash={gameState.player.liquidCash}
+        stats={gameState.finances}
       />
 
-      <main className="p-6 max-w-7xl mx-auto space-y-8 mt-4">
-        <header className="mb-8">
-          <h2 className="text-3xl font-light text-white">Financial Summary</h2>
-          <p className="text-neutral-500">Markets never sleep.</p>
-        </header>
+      {/* NUEVO LAYOUT: Sidebar + Main Content */}
+      <div className="flex flex-1 overflow-hidden h-[calc(100vh-64px)]">
+        
+        {/* Menú Lateral */}
+        <Sidebar currentTab={currentTab} />
 
-        <Inventory 
-          availablesFacilities={{
-            HQ: hqFacilitiesAvailables,
-            HQCapacity: hqLevelData?.capacity || 0,
-            OFFICE: officeFacilities,
-            DATACENTER: datacenterFacilities,
-            BASEMENT: basementFacilities
-          }}
-          availablesEmployees={{
-            programmers: employees.PROGRAMMER,
-            totalProgrammersCapacity: totalProgrammersCapacity,
-            analysts: employees.ANALYST,
-            totalAnalystsCapacity: totalAnalystsCapacity,
-            saboteurs: employees.SABOTEUR,
-            totalSaboteursCapacity: totalSaboteursCapacity
-          }}
-        />
+        {/* Contenedor Principal (Con scroll propio) */}
+        <main className="flex-1 overflow-y-auto p-6 lg:p-10 bg-[#0a0a0a]">
+          
+          {currentTab === 'overview' ? (
+            <div className="animate-in fade-in duration-500">
+              <header className="mb-8">
+                <h2 className="text-3xl font-light text-white">Resumen Ejecutivo</h2>
+                <p className="text-neutral-500">Visión global de tu imperio corporativo y métricas clave.</p>
+              </header>
+              <Inventory infrastructure={gameState.infrastructure} staff={gameState.staff} />
+            </div>
+          ) : (
+            <DashboardControls 
+              currentTab={currentTab} 
+              player={gameState.player}
+              infrastructure={gameState.infrastructure}
+              staff={gameState.staff}
+            />
+          )}
 
-        <DashboardControls 
-        liquidCash={company.liquidCash}
-        facilities={counts}
-        employees={employees}
-        capacities={capacities}
-        safeFacilitiesSlotsUnlocked={hqFacilitiesAvailables * sanitizeNumber(hqLevelData?.capacity, 0, { min: 0 })}
-        levels={{
-          HQ: company.hqLevel || 1,
-          OFFICE: company.officeLevel || 1, 
-          DATACENTER: company.datacenterLevel || 1,
-          BASEMENT: company.basementLevel || 1,
-        }}
-        />
-      </main>
+        </main>
+      </div>
 
       { ShowSettings && (
-        <SettingsModal
-          currentCompany={ company.companyName }
-          currentCeo={ company.ceoName }
-          isOpen={true}
-        />
+        <SettingsModal currentCompany={gameState.player.companyName} currentCeo={gameState.player.name} isOpen={true} />
       )}
     </div>
   )

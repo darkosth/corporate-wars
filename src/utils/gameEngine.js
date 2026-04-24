@@ -6,6 +6,9 @@ import { sanitizeCompany, sanitizeNumber } from './company'
 function getBuildingSnapshot(type, count, level) {
   const buildingBase = BUILDINGS[type];
   const levelConf = buildingBase.levels[level] || buildingBase.levels[1];
+  
+
+  const nextLevelConf = buildingBase.levels[level + 1]; 
 
   return {
     type,
@@ -17,16 +20,19 @@ function getBuildingSnapshot(type, count, level) {
       emoji: buildingBase.emoji,
       description: buildingBase.description,
       basePrice: buildingBase.basePrice,
-      upgradeCost: levelConf.upgradeCost,
       baseMaintenance: levelConf.maintenance,
       baseRevenue: levelConf.revenue,
-      unitCapacity: levelConf.capacity // Para HQ esto son parcelas, para otros es espacio de empleados
+      unitCapacity: levelConf.capacity,
+      
+      // LA MAGIA DE LOS UPGRADES
+      nextUpgradeCost: nextLevelConf ? nextLevelConf.upgradeCost : null,
+      isMaxLevel: !nextLevelConf 
     },
     // _SNAP: Estado dinámico calculado
     [type + '_SNAP']: {
       totalMaintenance: count * levelConf.maintenance,
       totalRevenue: count * levelConf.revenue,
-      totalCapacity: count * levelConf.capacity // <--- Aquí se calcula el cupo total
+      totalCapacity: count * levelConf.capacity
     }
   };
 }
@@ -94,8 +100,8 @@ export function calculateGameState(company) {
   const totalExpenses = 
     hq.HQ_SNAP.totalMaintenance + office.OFFICE_SNAP.totalMaintenance + 
     datacenter.DATACENTER_SNAP.totalMaintenance + basement.BASEMENT_SNAP.totalMaintenance +
-    programmers.PROGRAMMER_SNAP.totalSalary + analysts.ANALYST_SNAP.totalSalary + 
-    programmers.PROGRAMMER_SNAP.totalSalary + saboteurs.SABOTEUR_SNAP.totalSalary;
+    programmers.PROGRAMMER_SNAP.totalSalary + analysts.ANALYST_SNAP.totalSalary +
+    saboteurs.SABOTEUR_SNAP.totalSalary;
 
   return {
     player: {
