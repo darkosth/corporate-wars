@@ -16,3 +16,14 @@
 ## 🛡️ Validation & Architecture
 - **Sanity Check**: After every change, verify if the new logic breaks the game engine's "Snapshot" pattern or the database schema.
 - **State Integrity**: Ensure that financial calculations always go through the `gameEngine.js` to maintain a single source of truth.
+
+### 🧱 Coding Standards & Object Integrity
+- **NO "ON-THE-FLY" PROPERTIES**: Do not create or attach new properties to an object after its initial declaration.
+- **OBJECT BLUEPRINTS**: If an object needs specific properties (even if calculated later), they MUST be defined during the initial declaration with placeholder values (e.g., `0`, `null`, `false`, or `""`).
+- **EXPLICIT UPDATES**: Always define the full "shape" of the object at the top of the logic block and then update those existing properties with the actual data.
+- **REASONING**: This ensures a predictable data structure (contract), improves V8 engine performance, and prevents "hidden" properties that are hard to track in large components.
+
+### ❌ Bad Practice (On-the-fly)
+```javascript
+const stats = { gross: 100 };
+stats.net = stats.gross - expenses; // Dynamic creation - FORBIDDEN

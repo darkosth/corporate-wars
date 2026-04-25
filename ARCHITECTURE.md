@@ -17,6 +17,12 @@
 - `src/components/ui/StaffActionCard.js`: Specialized card for HR with Hire/Fire tabs and Sliders.
 - `src/components/Sidebar.js` & `TopBar.js`: Layout and navigation.
 
+## 🧱 Component Philosophy: Presentational
+- **Dumb Components (UI)**: Located in `src/components/ui/`. They are **Presentational Components**. 
+  - They MUST NOT contain business logic or game math.
+  - They MUST receive all data via props (using `_CONF` and `_SNAP` patterns).
+  - They MUST trigger actions via passed-down functions (callbacks).
+
 ## 📖 Data Mapping Dictionary (CRITICAL)
 *Use these exact names when interacting with Prisma or Logic.*
 
