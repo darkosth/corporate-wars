@@ -179,7 +179,7 @@ export async function sellFacility(type) {
 
     // REGLA 2: Lógica de Cascada (Capacidad vs Ocupación)
     if (type === 'HQ') {
-      const capacityPerHQ = facilityData[`HQ_CONF`].levels[facilityData.level].capacity;
+      const capacityPerHQ = facilityData[`HQ_CONF`].unitCapacity;
       const newTotalCapacity = gameState.infrastructure.slots.total - capacityPerHQ;
       if (gameState.infrastructure.slots.occupied > newTotalCapacity) {
         return { error: "Debes vender otros edificios primero. Las parcelas de este HQ están en uso." }
@@ -189,7 +189,7 @@ export async function sellFacility(type) {
       const role = roleMap[type];
       const staffData = gameState.staff[role];
       
-      const capacityPerBuilding = facilityData[`${type}_CONF`].levels[facilityData.level].capacity;
+      const capacityPerBuilding = facilityData[`${type}_CONF`].unitCapacity;
       const newTotalCapacity = facilityData[`${type}_SNAP`].totalCapacity - capacityPerBuilding;
       
       if (staffData && staffData.count > newTotalCapacity) {
